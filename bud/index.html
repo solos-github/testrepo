@@ -32,9 +32,14 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
   html.gross .bw .total { font-size: 36px; }
   html.gross .bw svg { width: 440px; height: 440px; }
   html.gross .bw table { font-size: 15px; }
+  .jp-title { font: 600 16px -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px 16px 0;
+              padding-bottom: 8px; border-bottom: 1px solid #dfe1e6; display: flex; align-items: center; gap: 8px; }
+  .jp-title .ico { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+  html.gross .jp-title { max-width: 1100px; margin: 20px auto 0; padding-left: 24px; padding-right: 24px; font-size: 20px; }
 </style>
 </head>
 <body>
+<div class="jp-title"><span class="ico" style="background:#2a78d6"></span>Budget-Übersicht</div>
 <div class="bw">
   <div class="head"><h2>Budget gesamt</h2><button class="big-btn" id="bw-big" title="In einem neuen Tab über die ganze Breite anzeigen">&#x2922; Großansicht</button></div>
   <p class="total" id="bw-total">Lade …</p>
@@ -123,7 +128,9 @@ var Jira = (function () {
     if (!box) {
       box = document.createElement('div'); box.id = 'jp-projbar';
       box.style.cssText = 'font: 13px -apple-system, "Segoe UI", Roboto, sans-serif; color: #44546f; margin: 12px 16px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;';
-      document.body.insertBefore(box, document.body.firstChild);
+      var title = document.querySelector('.jp-title');
+      if (title && title.nextSibling) document.body.insertBefore(box, title.nextSibling);
+      else document.body.insertBefore(box, document.body.firstChild);
     }
     return box;
   }
