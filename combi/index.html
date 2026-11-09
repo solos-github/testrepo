@@ -124,7 +124,9 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
   html.gross .jp-title { max-width: 1600px; margin: 20px auto 0; padding-left: 24px; padding-right: 24px; font-size: 20px; }
   /* Panel: nur Überschriften */
   html:not(.gross) .jp-sec .big-btn { display: none; }
-  html:not(.gross) .jp-sec > :not(.jp-title):not(.jp-note) { display: none; }
+  html:not(.gross) .jp-sec:not(.offen) > :not(.jp-title):not(.jp-note) { display: none; }
+  html:not(.gross) .jp-sec.offen > .jp-title .jp-open { transform: rotate(180deg); display: inline-block; }
+  html:not(.gross) .jp-sec.offen > .jp-title { background: #f7f8f9; }
   .jp-sec > .jp-title { cursor: pointer; user-select: none; margin: 10px 12px 0; padding: 10px 12px; border: 1px solid #dfe1e6;
                         border-radius: 6px; font-size: 15px; }
   .jp-sec > .jp-title:hover, .jp-sec > .jp-title:focus { background: #f1f2f4; outline: none; border-color: #c1c7d0; }
@@ -137,6 +139,8 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
   html.gross .jp-sec > .jp-note, html.gross .jp-sec .jp-info, html.gross .jp-sec .jp-open { display: none; }
   html.gross .jp-sec > .jp-title { cursor: default; border: 0; border-bottom: 1px solid #dfe1e6; border-radius: 0; background: none; }
   html.gross.nur-budget #sec-kalender, html.gross.nur-kalender #sec-budget { display: none; }
+  .jp-hint-inline { margin: 10px 14px 0; font: 12px -apple-system, "Segoe UI", Roboto, sans-serif; color: #626f86; }
+  .jp-hint-inline:empty { display: none; }
 </style>
 </head>
 <body>
@@ -200,7 +204,7 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
    die bereits geladenen Daten direkt im Browser (postMessage). Die Daten gehen dabei weder
    über den Webserver noch in die URL. */
 var Jira = (function () {
-  var VERSION = '09.11.2026 15:14';
+  var VERSION = '09.11.2026 15:24';
   var BIG = /[?&]gross=1(&|$)/.test(window.location.search);
   if (window.console) console.info('Jira-Panels Version ' + VERSION);
   // kleine Versionsangabe unten im Panel (zum Prüfen, ob die neue Datei geladen ist)
@@ -365,14 +369,26 @@ var Jira = (function () {
       var req = root.requestFullscreen || root.webkitRequestFullscreen || root.mozRequestFullScreen;
       var enabled = document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled;
       if (req && enabled) {
+        var failed = false;
+        function fsFail() {
+          if (failed || fsElement()) return;
+          failed = true;
+          document.removeEventListener('fullscreenerror', fsFail);
+          document.removeEventListener('mozfullscreenerror', fsFail);
+          document.removeEventListener('webkitfullscreenerror', fsFail);
+          root.className = root.className.replace(/\s*\bnur-\w+/g, '');
+          if (onError) onError(msg);
+        }
+        // Ablehnung kommt je nach Browser als Promise-Fehler, als Fehlerereignis oder gar nicht
+        document.addEventListener('fullscreenerror', fsFail);
+        document.addEventListener('mozfullscreenerror', fsFail);
+        document.addEventListener('webkitfullscreenerror', fsFail);
         var p = null;
-        try { p = req.call(root); } catch (e) { if (onError) onError(msg); return; }
+        try { p = req.call(root); } catch (e) { fsFail(); return; }
         if (onError) onError('');
         if (beforeFs) beforeFs();
-        if (p && p.catch) p.catch(function () {
-          root.className = root.className.replace(/\s*\bnur-\w+/g, '');
-          if (onError) onError(msg + ' (Version ' + VERSION + ')');
-        });
+        if (p && p.catch) p.catch(fsFail);
+        setTimeout(function () { if (!fsElement()) fsFail(); }, 800);
         return;
       }
       if (onError) onError('');
@@ -400,39 +416,6 @@ var Jira = (function () {
     // 1. Versuch: neuer Tab. 2. Versuch (falls der Rahmen keine neuen Fenster erlaubt): Vollbild.
     // Großansicht öffnen: neuer Tab, sonst Vollbild. extra = zusätzliche URL-Parameter (z. B. 'ansicht=budget'),
     // beforeFs = Funktion, die vor dem Vollbild aufgerufen wird (z. B. um nur einen Bereich zu zeigen).
-    openBig: function (extra, onError, beforeFs) {
-      var root = document.documentElement;
-      if (onError) onError('');
-      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document); return; }
-      var base = window.location.href.split('#')[0].replace(/([?&])(gross|ansicht)=[^&]*/g, '$1').replace(/[?&]+$/, '').replace(/\?&+/, '?');
-      var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'gross=1' + (extra ? '&' + extra : '');
-      var w = null;
-      try { w = window.open(url, '_blank'); } catch (e) { w = null; }
-      if (!w) {
-        var req = root.requestFullscreen || root.webkitRequestFullscreen;
-        var enabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
-        var msg = 'Großansicht nicht möglich: ScriptRunner erlaubt im Panel weder neue Tabs noch Vollbild. Tipp: Vorgang in der Vollansicht öffnen und die Seitenleiste breiter ziehen.';
-        if (!req || !enabled) { if (onError) onError(msg); return; }
-        if (beforeFs) beforeFs();
-        try {
-          var p = req.call(root);
-          if (p && p.catch) p.catch(function () { if (onError) onError(msg); });
-        } catch (e) { if (onError) onError(msg); }
-        return;
-      }
-      window.addEventListener('message', function handler(e) {
-        if (e.source !== w || !e.data || e.data.type !== 'jp-ready') return;
-        window.removeEventListener('message', handler);
-        var tries = 0;
-        (function send() {
-          // laufende Abfragen erst abschließen lassen (max. 15 Sekunden)
-          if (inflight > 0 && ++tries < 150) return setTimeout(send, 100);
-          var c = {}; var src = ctx(); for (var k in src) c[k] = src[k];
-          if (resolvedKey) c.projectKey = resolvedKey;
-          w.postMessage({ type: 'jp-data', cache: cache, ctx: c }, target());
-        })();
-      });
-    },
     // Button "Großansicht" einrichten (im Panel sichtbar, in der Großansicht ausgeblendet)
     bigButton: function (btn, onError) {
       if (!btn) return;
@@ -1184,6 +1167,12 @@ var Jira = (function () {
   document.addEventListener('fullscreenchange', onFs);
   document.addEventListener('webkitfullscreenchange', onFs);
 
+  var inlineMode = false;
+  // Hinweis oberhalb der Bereiche (nur wenn Großansicht nicht geht)
+  var hint = document.createElement('div'); hint.className = 'jp-hint-inline';
+  var firstSec = document.querySelector('.jp-sec');
+  if (firstSec) firstSec.parentNode.insertBefore(hint, firstSec);
+
   var secs = [
     { id: 'sec-budget', name: 'budget', ready: function () { return !/Lade/.test(txt('bw-total')); },
       info: function () { var t = txt('bw-total'); return t && t !== '–' ? t : ''; }, msg: function () { return txt('bw-msg'); } },
@@ -1205,9 +1194,21 @@ var Jira = (function () {
     title.setAttribute('role', 'button');
     title.setAttribute('tabindex', '0');
     title.title = 'In der Großansicht öffnen';
+    function toggleInline() {
+      var open = /\boffen\b/.test(sec.className);
+      sec.className = open ? sec.className.replace(/\s*\boffen\b/, '') : sec.className + ' offen';
+      try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+    }
     function go() {
       if (Jira.isBig || Jira.isFullscreen()) return;
-      Jira.openBig('ansicht=' + s.name, function (t) { if (t) note.textContent = t; }, function () { setNur(s.name); });
+      // Browser hat Großansicht schon einmal abgelehnt: direkt im Panel auf-/zuklappen
+      if (inlineMode) { toggleInline(); return; }
+      Jira.openBig('ansicht=' + s.name, function (t) {
+        if (!t) return;
+        inlineMode = true;
+        hint.textContent = 'Großansicht ist in diesem Browser nicht möglich. Der Bereich wird stattdessen hier im Panel angezeigt (Klick auf die Überschrift klappt ihn wieder zu).';
+        toggleInline();
+      }, function () { setNur(s.name); });
     }
     title.onclick = go;
     title.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
