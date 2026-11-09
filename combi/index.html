@@ -200,7 +200,17 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
    die bereits geladenen Daten direkt im Browser (postMessage). Die Daten gehen dabei weder
    über den Webserver noch in die URL. */
 var Jira = (function () {
+  var VERSION = '09.11.2026 15:14';
   var BIG = /[?&]gross=1(&|$)/.test(window.location.search);
+  if (window.console) console.info('Jira-Panels Version ' + VERSION);
+  // kleine Versionsangabe unten im Panel (zum Prüfen, ob die neue Datei geladen ist)
+  (function addVersion() {
+    if (!document.body) return setTimeout(addVersion, 50);
+    if (document.getElementById('jp-version')) return;
+    var v = document.createElement('div'); v.id = 'jp-version'; v.textContent = 'Version ' + VERSION;
+    v.style.cssText = 'font: 10px -apple-system, "Segoe UI", Roboto, sans-serif; color: #8590a2; margin: 12px 16px 8px; text-align: right;';
+    document.body.appendChild(v);
+  })();
   var cache = {};          // im Panel: geladene Antworten; in der Großansicht: übergebene Antworten
   var bigCtx = null;       // Kontext (Projekt) in der Großansicht
   var lastError = '';
@@ -305,6 +315,7 @@ var Jira = (function () {
 
   return {
     isBig: BIG,
+    version: VERSION,
     error: function () { return lastError; },
     // Panel: wartet bis zu 10 Sekunden auf die Bridge. Großansicht: holt die Daten vom Panel.
     ready: function (cb) {
@@ -347,22 +358,24 @@ var Jira = (function () {
     // beforeFs = Funktion, die vor dem Vollbild aufgerufen wird (z. B. um nur einen Bereich zu zeigen).
     openBig: function (extra, onError, beforeFs) {
       var root = document.documentElement;
-      if (onError) onError('');
-      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document); return; }
       var msg = 'Großansicht nicht möglich: ScriptRunner erlaubt im Panel weder neue Tabs noch Vollbild. Tipp: Vorgang in der Vollansicht öffnen und die Seitenleiste breiter ziehen.';
+      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document); return; }
 
-      // 1. Vollbild zuerst: Firefox wertet einen blockierten Tab-Versuch als "verbrauchten" Klick
-      //    und lehnt danach Vollbild ab. Deshalb Vollbild direkt im Klick anfordern.
+      // 1. Vollbild als ALLERERSTES im Klick anfordern (Firefox verlangt das unmittelbar im Klick).
       var req = root.requestFullscreen || root.webkitRequestFullscreen || root.mozRequestFullScreen;
       var enabled = document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled;
       if (req && enabled) {
+        var p = null;
+        try { p = req.call(root); } catch (e) { if (onError) onError(msg); return; }
+        if (onError) onError('');
         if (beforeFs) beforeFs();
-        try {
-          var p = req.call(root);
-          if (p && p.catch) p.catch(function () { if (beforeFs) root.className = root.className.replace(/\s*\bnur-\w+/g, ''); if (onError) onError(msg); });
-        } catch (e) { if (onError) onError(msg); }
+        if (p && p.catch) p.catch(function () {
+          root.className = root.className.replace(/\s*\bnur-\w+/g, '');
+          if (onError) onError(msg + ' (Version ' + VERSION + ')');
+        });
         return;
       }
+      if (onError) onError('');
 
       // 2. Kein Vollbild erlaubt: neuer Tab, Daten werden direkt im Browser übergeben
       var base = window.location.href.split('#')[0].replace(/([?&])(gross|ansicht)=[^&]*/g, '$1').replace(/[?&]+$/, '').replace(/\?&+/, '?');
