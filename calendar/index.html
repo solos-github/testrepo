@@ -69,9 +69,14 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
   .jk .ev.cont-l { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
   .jk .ev.cont-r { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: -1px; }
   html.gross .jk .ev { font-size: 12px; }
+  .jp-title { font: 600 16px -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px 16px 0;
+              padding-bottom: 8px; border-bottom: 1px solid #dfe1e6; display: flex; align-items: center; gap: 8px; }
+  .jp-title .ico { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+  html.gross .jp-title { max-width: 1600px; margin: 20px auto 0; padding-left: 24px; padding-right: 24px; font-size: 20px; }
 </style>
 </head>
 <body>
+<div class="jp-title"><span class="ico" style="background:#1f845a"></span>Jahreskalender</div>
 <div class="jk">
   <div class="bar">
     <button id="jk-prev" title="Einen Monat zurück">&#8249;</button>
@@ -169,7 +174,9 @@ var Jira = (function () {
     if (!box) {
       box = document.createElement('div'); box.id = 'jp-projbar';
       box.style.cssText = 'font: 13px -apple-system, "Segoe UI", Roboto, sans-serif; color: #44546f; margin: 12px 16px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;';
-      document.body.insertBefore(box, document.body.firstChild);
+      var title = document.querySelector('.jp-title');
+      if (title && title.nextSibling) document.body.insertBefore(box, title.nextSibling);
+      else document.body.insertBefore(box, document.body.firstChild);
     }
     return box;
   }
