@@ -204,7 +204,7 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
    die bereits geladenen Daten direkt im Browser (postMessage). Die Daten gehen dabei weder
    über den Webserver noch in die URL. */
 var Jira = (function () {
-  var VERSION = '09.11.2026 15:24';
+  var VERSION = '09.11.2026 20:40';
   var BIG = /[?&]gross=1(&|$)/.test(window.location.search);
   if (window.console) console.info('Jira-Panels Version ' + VERSION);
   // kleine Versionsangabe unten im Panel (zum Prüfen, ob die neue Datei geladen ist)
@@ -369,26 +369,41 @@ var Jira = (function () {
       var req = root.requestFullscreen || root.webkitRequestFullscreen || root.mozRequestFullScreen;
       var enabled = document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled;
       if (req && enabled) {
-        var failed = false;
+        var settled = false, timer = null;
+        var EV_ERR = ['fullscreenerror', 'mozfullscreenerror', 'webkitfullscreenerror'];
+        var EV_CHG = ['fullscreenchange', 'mozfullscreenchange', 'webkitfullscreenchange'];
+        function cleanup() {
+          clearTimeout(timer);
+          EV_ERR.forEach(function (n) { document.removeEventListener(n, fsFail); });
+          EV_CHG.forEach(function (n) { document.removeEventListener(n, fsOk); });
+        }
+        function fsOk() {
+          if (settled || !fsElement()) return;
+          settled = true; cleanup();
+        }
         function fsFail() {
-          if (failed || fsElement()) return;
-          failed = true;
-          document.removeEventListener('fullscreenerror', fsFail);
-          document.removeEventListener('mozfullscreenerror', fsFail);
-          document.removeEventListener('webkitfullscreenerror', fsFail);
+          if (settled) return;
+          if (fsElement()) { fsOk(); return; }
+          settled = true; cleanup();
           root.className = root.className.replace(/\s*\bnur-\w+/g, '');
           if (onError) onError(msg);
         }
-        // Ablehnung kommt je nach Browser als Promise-Fehler, als Fehlerereignis oder gar nicht
-        document.addEventListener('fullscreenerror', fsFail);
-        document.addEventListener('mozfullscreenerror', fsFail);
-        document.addEventListener('webkitfullscreenerror', fsFail);
+        // Ergebnis kommt je nach Browser als Promise, als Ereignis oder (alte Browser) gar nicht
+        EV_ERR.forEach(function (n) { document.addEventListener(n, fsFail); });
+        EV_CHG.forEach(function (n) { document.addEventListener(n, fsOk); });
         var p = null;
         try { p = req.call(root); } catch (e) { fsFail(); return; }
         if (onError) onError('');
         if (beforeFs) beforeFs();
-        if (p && p.catch) p.catch(fsFail);
-        setTimeout(function () { if (!fsElement()) fsFail(); }, 800);
+        if (p && p.then) {
+          // Der Browser meldet Erfolg oder Ablehnung selbst: keine knappe Zeitgrenze,
+          // nur eine Sicherung, falls nie eine Antwort kommt
+          p.then(fsOk, fsFail);
+          timer = setTimeout(fsFail, 10000);
+        } else {
+          // Alte Schnittstelle ohne Rückmeldung: großzügig warten
+          timer = setTimeout(fsFail, 3000);
+        }
         return;
       }
       if (onError) onError('');
@@ -428,6 +443,7 @@ var Jira = (function () {
       }
       document.addEventListener('fullscreenchange', onFsChange);
       document.addEventListener('webkitfullscreenchange', onFsChange);
+      document.addEventListener('mozfullscreenchange', onFsChange);
       btn.onclick = function () { self.openBig('', onError); };
     },
     isFullscreen: function () { return !!fsElement(); },
@@ -618,6 +634,8 @@ var Jira = (function () {
   var STATUSES = String(CFG.status).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   var COLORS = String(CFG.farben).split(',').map(function (s) { return s.trim(); });
   var NONE = { name: 'Ohne Budgetstatus', color: '#c1c7d0' };
+  // Ersatzfarben, falls mehr Optionen als Farben eingetragen sind
+  var EXTRA = ['#6250d6', '#e87ba4', '#eda100', '#008300', '#e34948', '#44546f'];
 
   var issues = [];            // { key, summary, status, year, plan, ist }
   var year = parseInt(CFG.jahr, 10) || new Date().getFullYear();
@@ -724,7 +742,7 @@ var Jira = (function () {
     $('bw-msg').textContent = '';
 
     // Gruppen: konfigurierte Status + Sonstige
-    var groups = STATUSES.map(function (n, i) { return { name: n, color: COLORS[i] || OTHER.color, plan: 0, ist: 0, count: 0 }; });
+    var groups = STATUSES.map(function (n, i) { return { name: n, color: COLORS[i] || EXTRA[(i - COLORS.length) % EXTRA.length], plan: 0, ist: 0, count: 0 }; });
     var other = { name: NONE.name, color: NONE.color, plan: 0, ist: 0, count: 0, members: {} };
     var fallback = groups.filter(function (g) { return g.name.toLowerCase() === 'sonstige'; })[0] || null;
     var noDate = 0, inYear = 0;
@@ -821,8 +839,8 @@ var Jira = (function () {
       if (window.console) console.info('Budget-Panel Diagnose', diag, 'JQL:', jql);
     } else if (!inYear) {
       var yrs = {}; issues.forEach(function (it) { if (it.year) yrs[it.year] = 1; });
-      var list = Object.keys(yrs).sort();
-      $('bw-msg').textContent = 'Keine Vorgänge mit Fälligkeit ' + year + '.' + (list.length ? ' Daten vorhanden für: ' + list.join(', ') + '.' : '');
+      var yrList = Object.keys(yrs).sort();
+      $('bw-msg').textContent = 'Keine Vorgänge mit Fälligkeit ' + year + '.' + (yrList.length ? ' Daten vorhanden für: ' + yrList.join(', ') + '.' : '');
     }
   }
 
@@ -1166,6 +1184,7 @@ var Jira = (function () {
   function onFs() { if (!Jira.isFullscreen()) setNur(''); }
   document.addEventListener('fullscreenchange', onFs);
   document.addEventListener('webkitfullscreenchange', onFs);
+  document.addEventListener('mozfullscreenchange', onFs);
 
   var inlineMode = false;
   // Hinweis oberhalb der Bereiche (nur wenn Großansicht nicht geht)
@@ -1214,20 +1233,30 @@ var Jira = (function () {
     title.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
   });
 
-  // Kurzinfo und Meldungen der Bereiche neben die Überschriften übernehmen
-  var ticks = 0;
-  (function update() {
-    var allReady = true;
+  // Kurzinfo und Meldungen der Bereiche neben die Überschriften übernehmen.
+  // Folgt jeder Änderung (z. B. Jahreswechsel), nicht nur dem ersten Laden.
+  function update() {
     secs.forEach(function (s) {
       if (!s.title) return;
-      var ready = s.ready();
-      allReady = allReady && ready;
-      s.infoEl.textContent = ready ? s.info() : 'lädt …';
+      var info = s.ready() ? s.info() : 'lädt …';
+      if (s.infoEl.textContent !== info) s.infoEl.textContent = info;
       var msg = s.msg();
-      if (msg && s.note.textContent !== msg) s.note.textContent = msg;
+      if (s.note.textContent !== msg) s.note.textContent = msg;
     });
-    if (!allReady || ++ticks < 20) setTimeout(update, allReady ? 1000 : 300);
-  })();
+  }
+  var pending = false;
+  function schedule() { if (pending) return; pending = true; setTimeout(function () { pending = false; update(); }, 50); }
+  var watched = ['bw-total', 'bw-msg', 'jk-status', 'jk-msg'];
+  if (window.MutationObserver) {
+    var mo = new MutationObserver(schedule);
+    watched.forEach(function (id) {
+      var e = document.getElementById(id);
+      if (e) mo.observe(e, { childList: true, characterData: true, subtree: true });
+    });
+  } else {
+    setInterval(update, 1000);   // sehr alte Browser
+  }
+  update();
 })();
 </script>
 </body>
