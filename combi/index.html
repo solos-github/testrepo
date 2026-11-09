@@ -229,7 +229,7 @@ var Jira = (function () {
   }
   var source = '';
   var inflight = 0;
-  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || null; }
   function onFsChangeGlobal() {
     var root = document.documentElement, on = !!fsElement();
     if (on) { if (!/\bgross\b/.test(root.className)) root.className += ' gross'; }
@@ -239,6 +239,7 @@ var Jira = (function () {
   if (!BIG) {
     document.addEventListener('fullscreenchange', onFsChangeGlobal);
     document.addEventListener('webkitfullscreenchange', onFsChangeGlobal);
+    document.addEventListener('mozfullscreenchange', onFsChangeGlobal);
   }
   var resolveP = null, askP = null;
   // Kontext über die Atlassian-Schnittstelle AP (falls die Bridge sie bereitstellt), max. 2 Sekunden
@@ -347,7 +348,49 @@ var Jira = (function () {
     openBig: function (extra, onError, beforeFs) {
       var root = document.documentElement;
       if (onError) onError('');
-      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document); return; }
+      var msg = 'Großansicht nicht möglich: ScriptRunner erlaubt im Panel weder neue Tabs noch Vollbild. Tipp: Vorgang in der Vollansicht öffnen und die Seitenleiste breiter ziehen.';
+
+      // 1. Vollbild zuerst: Firefox wertet einen blockierten Tab-Versuch als "verbrauchten" Klick
+      //    und lehnt danach Vollbild ab. Deshalb Vollbild direkt im Klick anfordern.
+      var req = root.requestFullscreen || root.webkitRequestFullscreen || root.mozRequestFullScreen;
+      var enabled = document.fullscreenEnabled || document.webkitFullscreenEnabled || document.mozFullScreenEnabled;
+      if (req && enabled) {
+        if (beforeFs) beforeFs();
+        try {
+          var p = req.call(root);
+          if (p && p.catch) p.catch(function () { if (beforeFs) root.className = root.className.replace(/\s*\bnur-\w+/g, ''); if (onError) onError(msg); });
+        } catch (e) { if (onError) onError(msg); }
+        return;
+      }
+
+      // 2. Kein Vollbild erlaubt: neuer Tab, Daten werden direkt im Browser übergeben
+      var base = window.location.href.split('#')[0].replace(/([?&])(gross|ansicht)=[^&]*/g, '$1').replace(/[?&]+$/, '').replace(/\?&+/, '?');
+      var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'gross=1' + (extra ? '&' + extra : '');
+      var w = null;
+      try { w = window.open(url, '_blank'); } catch (e) { w = null; }
+      if (!w) { if (onError) onError(msg); return; }
+      window.addEventListener('message', function handler(e) {
+        if (e.source !== w || !e.data || e.data.type !== 'jp-ready') return;
+        window.removeEventListener('message', handler);
+        var tries = 0;
+        (function send() {
+          // laufende Abfragen erst abschließen lassen (max. 15 Sekunden)
+          if (inflight > 0 && ++tries < 150) return setTimeout(send, 100);
+          var c = {}; var src = ctx(); for (var k in src) c[k] = src[k];
+          if (resolvedKey) c.projectKey = resolvedKey;
+          w.postMessage({ type: 'jp-data', cache: cache, ctx: c }, target());
+        })();
+      });
+    },
+    // Button "Großansicht" einrichten (im Panel sichtbar, in der Großansicht ausgeblendet)
+    // 1. Versuch: neuer Tab. 2. Versuch (falls der Rahmen keine neuen Fenster erlaubt): Vollbild.
+    // Großansicht öffnen: neuer Tab, sonst Vollbild. extra = zusätzliche URL-Parameter (z. B. 'ansicht=budget'),
+    // beforeFs = Funktion, die vor dem Vollbild aufgerufen wird (z. B. um nur einen Bereich zu zeigen).
+    openBig: function (extra, onError, beforeFs) {
+      var root = document.documentElement;
+      if (onError) onError('');
+      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document); return; }
       var base = window.location.href.split('#')[0].replace(/([?&])(gross|ansicht)=[^&]*/g, '$1').replace(/[?&]+$/, '').replace(/\?&+/, '?');
       var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'gross=1' + (extra ? '&' + extra : '');
       var w = null;
