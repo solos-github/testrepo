@@ -119,6 +119,50 @@ var Jira = (function () {
     } catch (e) {}
     return '';
   }
+  var source = '';
+  // Kontext über die Atlassian-Schnittstelle AP (falls die Bridge sie bereitstellt), max. 2 Sekunden
+  function apContext() {
+    return new Promise(function (resolve) {
+      var AP = window.AP, done = false;
+      if (!AP || !AP.context || !AP.context.getContext) return resolve({});
+      var t = setTimeout(function () { if (!done) { done = true; resolve({}); } }, 2000);
+      try {
+        var r = AP.context.getContext(function (c) { if (!done) { done = true; clearTimeout(t); resolve(c || {}); } });
+        if (r && r.then) r.then(function (c) { if (!done) { done = true; clearTimeout(t); resolve(c || {}); } }, function () {});
+      } catch (e) { done = true; clearTimeout(t); resolve({}); }
+    });
+  }
+  // Atlassian-Rahmen legen Angaben teils als JSON im Fensternamen ab
+  function windowNameInfo() {
+    try { return window.name ? JSON.parse(window.name) : {}; } catch (e) { return {}; }
+  }
+  function deepFind(obj, names, depth) {
+    if (!obj || typeof obj !== 'object' || (depth || 0) > 6) return '';
+    var direct = pick(obj, names); if (direct) return direct;
+    for (var k in obj) {
+      var v = obj[k];
+      if (typeof v === 'string' && v.charAt(0) === '{') { try { v = JSON.parse(v); } catch (e) {} }
+      var r = deepFind(v, names, (depth || 0) + 1); if (r) return r;
+    }
+    return '';
+  }
+  // Browser-Speicher (kann in eingeschränkten Rahmen gesperrt sein)
+  function store(k, v) {
+    try {
+      if (v === undefined) return window.localStorage.getItem(k) || '';
+      if (v === null) window.localStorage.removeItem(k); else window.localStorage.setItem(k, v);
+    } catch (e) {}
+    return '';
+  }
+  function projectBar() {
+    var box = document.getElementById('jp-projbar');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'jp-projbar';
+      box.style.cssText = 'font: 13px -apple-system, "Segoe UI", Roboto, sans-serif; color: #44546f; margin: 12px 16px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;';
+      document.body.insertBefore(box, document.body.firstChild);
+    }
+    return box;
+  }
   function issueFromText(t) {
     var m = /(?:\/browse\/|selectedIssue=)([A-Z][A-Z0-9_]*-\d+)/i.exec(t || '');
     return m ? m[1] : '';
@@ -268,33 +312,102 @@ var Jira = (function () {
     resolveProject: function (configured) {
       var self = this;
       if (configured) { resolvedKey = configured; return Promise.resolve(configured); }
+      var apc = {}, apDone = false;
+      apContext().then(function (c) { apc = c || {}; apDone = true; });
+      // gespeichertes Projekt vorhanden: nur kurz warten, sonst bis zu 5 Sekunden
+      var maxTries = store('jp-projekt') ? 5 : 25;
+      function found() {
+        var c = ctx(), wn = windowNameInfo();
+        return pick(c, ['projectKey', 'project.key', 'issueKey', 'issue.key']) ||
+               pick(apc, ['jira.project.key', 'jira.issue.key', 'project.key', 'issue.key']) ||
+               deepFind(wn, ['project.key', 'projectKey', 'issue.key', 'issueKey']) ||
+               urlParam(['projekt', 'projectKey', 'project.key', 'issueKey', 'issue.key']) ||
+               issueFromText(document.referrer);
+      }
       return new Promise(function (resolve) {
         var tries = 0;
         (function wait() {
-          var c = ctx();
-          if (pick(c, ['projectKey', 'project.key']) || pick(c, ['issueKey', 'issue.key']) || ++tries > 25) return resolve();
+          if (found() || ++tries > maxTries) return resolve();
           setTimeout(wait, 200);
         })();
       }).then(function () {
-        var c = ctx();
-        var pk = pick(c, ['projectKey', 'project.key']) || urlParam(['projectKey', 'project.key', 'projectkey', 'project_key']);
-        if (pk) return pk;
-        var ik = pick(c, ['issueKey', 'issue.key']) || urlParam(['issueKey', 'issue.key', 'issuekey', 'issue_key']) || issueFromText(document.referrer);
+        // AP-Kontext evtl. noch unterwegs: höchstens bis zu dessen eigenem Zeitlimit warten
+        return apDone ? apc : apContext();
+      }).then(function (apc2) {
+        var apc = apc2 || {};
+        var c = ctx(), wn = windowNameInfo();
+        var pk = pick(c, ['projectKey', 'project.key']) || pick(apc, ['jira.project.key', 'project.key']) ||
+                 deepFind(wn, ['project.key', 'projectKey']) ||
+                 urlParam(['projekt', 'projectKey', 'project.key', 'projectkey', 'project_key']);
+        if (pk) { source = 'Kontext'; return pk; }
+        var ik = pick(c, ['issueKey', 'issue.key']) || pick(apc, ['jira.issue.key', 'issue.key']) ||
+                 deepFind(wn, ['issue.key', 'issueKey']) ||
+                 urlParam(['issueKey', 'issue.key', 'issuekey', 'issue_key']) || issueFromText(document.referrer);
         if (ik) {
+          source = 'Vorgang ' + ik;
           var m = /^([A-Z][A-Z0-9_]*)-\d+$/i.exec(ik);
           return self.get('/rest/api/3/issue/' + encodeURIComponent(ik) + '?fields=project').then(function (d) {
             return (d.fields && d.fields.project && d.fields.project.key) || (m ? m[1].toUpperCase() : '');
           }, function () { return m ? m[1].toUpperCase() : ''; });
         }
+        var saved = store('jp-projekt');
+        if (saved) { source = 'gespeichert'; return saved; }
         return '';
       }).then(function (key) { resolvedKey = key || ''; return resolvedKey; });
+    },
+    // Woher das Projekt stammt ('Kontext', 'Vorgang …', 'gespeichert', 'Auswahl')
+    projectSource: function () { return source; },
+    // Projektauswahl anzeigen, wenn kein Projekt ermittelt werden konnte. Liefert den gewählten Schlüssel.
+    askProject: function () {
+      var self = this;
+      return new Promise(function (resolve) {
+        var box = projectBar();
+        box.innerHTML = '';
+        var lbl = document.createElement('span'); lbl.textContent = 'Projekt wählen: ';
+        var sel = document.createElement('select'); sel.disabled = true;
+        var opt0 = document.createElement('option'); opt0.textContent = 'Lade Projekte …'; sel.appendChild(opt0);
+        var ok = document.createElement('button'); ok.textContent = 'Anzeigen'; ok.disabled = true;
+        box.appendChild(lbl); box.appendChild(sel); box.appendChild(ok);
+        var hint = document.createElement('div'); hint.className = 'jp-hint';
+        hint.textContent = 'Das Panel konnte das Projekt nicht automatisch erkennen. Die Auswahl wird in diesem Browser gespeichert.';
+        hint.style.cssText = 'width: 100%; font-size: 12px; color: #626f86;';
+        box.appendChild(hint);
+        self.get('/rest/api/3/project/search?maxResults=100&orderBy=name').then(function (d) {
+          var list = d.values || [];
+          sel.innerHTML = '';
+          list.forEach(function (p) {
+            var o = document.createElement('option'); o.value = p.key; o.textContent = p.name + ' (' + p.key + ')'; sel.appendChild(o);
+          });
+          if (!list.length) { var o = document.createElement('option'); o.textContent = 'Keine Projekte gefunden'; sel.appendChild(o); return; }
+          sel.disabled = false; ok.disabled = false;
+        }, function (err) { sel.innerHTML = '<option>Projektliste nicht ladbar (Status ' + self.status(err) + ')</option>'; });
+        ok.onclick = function () {
+          var key = sel.value; if (!key) return;
+          store('jp-projekt', key); resolvedKey = key; source = 'Auswahl';
+          self.showProject(key);
+          resolve(key);
+        };
+      });
+    },
+    // Zeigt "Projekt: ABC · ändern", wenn das Projekt gewählt/gespeichert wurde
+    showProject: function (key) {
+      if (BIG) return;
+      var box = projectBar();
+      box.innerHTML = '';
+      var t = document.createElement('span'); t.textContent = 'Projekt: ' + key + ' · ';
+      var a = document.createElement('a'); a.href = '#'; a.textContent = 'ändern';
+      a.onclick = function (e) { e.preventDefault(); store('jp-projekt', null); window.location.reload(); };
+      box.appendChild(t); box.appendChild(a);
     },
     // Was ScriptRunner übergibt (für Fehlermeldungen)
     contextInfo: function () {
       var info = {};
-      try { info = JSON.parse(JSON.stringify(ctx())); } catch (e) {}
+      try { info.kontext = JSON.parse(JSON.stringify(ctx())); } catch (e) {}
       info.urlParameter = window.location.search || '(keine)';
-      return JSON.stringify(info).slice(0, 300);
+      info.adresse = String(window.location.protocol) + (window.location.host ? '//' + window.location.host : '');
+      info.ap = typeof window.AP !== 'undefined';
+      info.fensterName = window.name ? 'vorhanden' : 'leer';
+      return JSON.stringify(info).slice(0, 400);
     },
     status: function (err) {
       if (!err) return '?';
@@ -371,7 +484,10 @@ var Jira = (function () {
     Jira.ready(function (ok) {
       if (!ok) { fail(Jira.error()); return; }
       Jira.resolveProject(CFG.projekt).then(function (key) {
-      if (!key) { fail('Projektschlüssel unbekannt. In der ScriptRunner-URL ?projekt=ABC anhängen. (Von ScriptRunner erhalten: ' + Jira.contextInfo() + ')'); return; }
+        if (key) { if (Jira.projectSource() === 'gespeichert') Jira.showProject(key); return key; }
+        if (window.console) console.info('Jira-Panel: Projekt nicht erkannt, Kontext:', Jira.contextInfo());
+        return Jira.askProject();
+      }).then(function (key) {
       var typeNames = String(CFG.typ).split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
       Jira.get('/rest/api/3/project/' + encodeURIComponent(key)).then(function (proj) {
         var types = proj.issueTypes || [];
