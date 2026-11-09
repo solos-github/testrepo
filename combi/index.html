@@ -374,7 +374,13 @@ var Jira = (function () {
     // Bei gleichnamigen Feldern (team-managed) wird das Feld des Projekts bevorzugt.
     resolveField: function (id, names, projectKey, schemaType, project) {
       var self = this;
-      if (id) return Promise.resolve({ id: id });
+      if (id) {
+        // feste ID: Feld-Infos nur für die Diagnose nachschlagen, die ID gilt in jedem Fall
+        return self.get('/rest/api/3/field').then(function (list) {
+          var hit = (Array.isArray(list) ? list : []).filter(function (f) { return f.id === id; })[0];
+          return hit || { id: id, name: '(nicht in Feldliste)' };
+        }, function () { return { id: id }; });
+      }
       var wanted = String(names || '').split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
       if (!wanted.length) return Promise.resolve(null);
       var projP = project ? Promise.resolve(project) : self.get('/rest/api/3/project/' + encodeURIComponent(projectKey));
@@ -528,8 +534,8 @@ var Jira = (function () {
   // z. B. .../budget/index.html?feldname=Kosten&gruppierung=epic   (siehe Anleitung)
   var DEFAULTS = {
     projekt:     '',        // leer = Projekt des geöffneten Vorgangs
-    feldname:    'Gesamtbudget',  // Name(n) des Budgetfelds, der erste vorhandene wird genommen
-    feld:        '',        // alternativ direkt die ID, z. B. customfield_10050
+    feldname:    'Gesamtbudget,Budget',  // Name(n) des Budgetfelds, der erste vorhandene wird genommen
+    feld:        'customfield_12413',  // ID des Feldes "Gesamtbudget" (leer = Suche über feldname)
     filter:      '',        // zusätzliche JQL-Bedingung, z. B. labels = 2027
     gruppierung: '',        // 'epic' = nach übergeordnetem Vorgang zusammenfassen
     stuecke:     8          // max. Kreisstücke, Rest wird "Sonstige"
@@ -542,6 +548,7 @@ var Jira = (function () {
 
   var COLORS = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#6250d6','#e34948'];
   var rows = [];
+  var diag = { projekt: '', feld: '', anzahl: 0, beispiele: [] };   // für Fehlermeldungen
   var $ = function (id) { return document.getElementById(id); };
   var fmt = function (n) { return n.toLocaleString('de-DE', { maximumFractionDigits: 2 }); };
   var pct = function (v, t) { return (t ? v / t * 100 : 0).toFixed(1).replace('.', ',') + ' %'; };
@@ -588,6 +595,8 @@ var Jira = (function () {
       chain.then(function (f) {
         if (!f) { fail('Feld "' + CFG.feldname.split(',').join('" bzw. "') + '" nicht gefunden. In der ScriptRunner-URL ?feldname=... oder ?feld=customfield_... angeben.'); return; }
         FIELD = f.id;
+        diag.projekt = key;
+        diag.feld = (f.name || '?') + ' (' + f.id + (f.schema && f.schema.type ? ', ' + f.schema.type : '') + (f.scope && f.scope.project ? ', nur Projekt-ID ' + f.scope.project.id : '') + ')';
         jql = 'project = "' + key + '" AND cf[' + f.id.replace('customfield_', '') + '] is not EMPTY' +
               (CFG.filter ? ' AND (' + CFG.filter + ')' : '') + ' ORDER BY created DESC';
         load();
@@ -604,6 +613,8 @@ var Jira = (function () {
     Jira.get(url).then(
       function (data) {
         (data.issues || []).forEach(function (i) {
+          diag.anzahl++;
+          if (diag.beispiele.length < 2) { var rv = i.fields[FIELD]; diag.beispiele.push(i.key + '=' + (rv === undefined ? 'nicht geliefert' : JSON.stringify(rv)).slice(0, 80)); }
           var amount = toAmount(i.fields[FIELD]);
           var label = i.key + ' ' + i.fields.summary;
           if (GROUP_BY_PARENT) {
@@ -633,7 +644,12 @@ var Jira = (function () {
                    .sort(function (a, b) { return b.amount - a.amount; });
     var total = data.reduce(function (s, r) { return s + r.amount; }, 0);
     $('bw-total').textContent = fmt(total) + ' €';
-    if (!data.length) { $('bw-msg').textContent = 'Keine Vorgänge mit Budget gefunden.'; return; }
+    if (!data.length) {
+      $('bw-msg').textContent = 'Keine Vorgänge mit Budget gefunden. Diagnose: Projekt ' + diag.projekt + ', Feld ' + diag.feld +
+        ', ' + diag.anzahl + ' Vorgänge mit befülltem Feld' + (diag.beispiele.length ? ', Beispielwerte: ' + diag.beispiele.join('; ') : '') + '.';
+      if (window.console) console.info('Budget-Panel Diagnose', diag, 'JQL:', jql);
+      return;
+    }
 
     var shown = data;
     if (data.length > MAX_SLICES) {
