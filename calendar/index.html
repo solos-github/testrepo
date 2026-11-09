@@ -6,7 +6,7 @@
 <title>Jahreskalender</title>
 <!-- Jahreskalender der Tasks (ScriptRunner Cloud Web Panel)
      Variante "Single URL": diese eine Datei hosten und ihre URL im Web Panel eintragen.
-     Einstellungen: im Skript unten im Abschnitt "HIER ANPASSEN". -->
+     Einstellungen: nichts eintragen, Abweichungen per URL-Parameter (siehe EINSTELLUNGEN.md). -->
 <style>
 html, body { margin: 0; padding: 0; background: #ffffff; }
   .jk { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px; font-size: 13px; }
@@ -53,6 +53,12 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
     .jk td, .jk th { padding: 5px 6px; }
     .jk .months { gap: 10px; }
   }
+  .jk .big-btn { font-size: 13px; }
+  html.gross .jk { max-width: 1600px; margin: 20px auto; padding: 0 20px; font-size: 14px; }
+  html.gross .jk .months { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  html.gross .jk .day { min-height: 44px; }
+  html.gross .jk .day .n { font-size: 12px; }
+  html.gross .jk .ln { height: 5px; }
 </style>
 </head>
 <body>
@@ -65,6 +71,7 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
     <span class="sp"></span>
     <button id="jk-vcal" class="on">12 Monate</button>
     <button id="jk-vlist">Liste</button>
+    <button class="big-btn" id="jk-big" title="In einem neuen Tab über die ganze Breite anzeigen">&#x2922; Großansicht</button>
   </div>
   <div class="legend">
     <span><i style="background:#8993a4"></i>Offen</span>
@@ -81,9 +88,18 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
 <script src="https://assets.hydrogen.sagittarius.connect.product.adaptavist.com/public/js/bridge.js"></script>
 <script>
 /* Verbindung zu Jira über die Adaptavist Bridge (ScriptRunner Cloud Web Panel) */
+/* Großansicht: Das Panel öffnet sich selbst in einem neuen Tab (?gross=1) und übergibt dort
+   die bereits geladenen Daten direkt im Browser (postMessage). Die Daten gehen dabei weder
+   über den Webserver noch in die URL. */
 var Jira = (function () {
+  var BIG = /[?&]gross=1(&|$)/.test(window.location.search);
+  var cache = {};          // im Panel: geladene Antworten; in der Großansicht: übergebene Antworten
+  var bigCtx = null;       // Kontext (Projekt) in der Großansicht
+  var lastError = '';
+
   function bridge() { return window.AdaptavistBridge && window.AdaptavistBridge.request ? window.AdaptavistBridge : null; }
-  function ctx() { return (window.AdaptavistBridgeContext && window.AdaptavistBridgeContext.context) || {}; }
+  function ctx() { return bigCtx || (window.AdaptavistBridgeContext && window.AdaptavistBridgeContext.context) || {}; }
+  function target() { return window.location.origin && window.location.origin !== 'null' ? window.location.origin : '*'; }
 
   function parse(d) {
     if (d && typeof d === 'object' && d.body !== undefined && !d.issues) d = d.body;
@@ -91,18 +107,94 @@ var Jira = (function () {
     return d || {};
   }
 
+  if (BIG) document.documentElement.className += ' gross';
+
   return {
-    // wartet bis zu 10 Sekunden, bis die Bridge geladen ist
+    isBig: BIG,
+    error: function () { return lastError; },
+    // Panel: wartet bis zu 10 Sekunden auf die Bridge. Großansicht: holt die Daten vom Panel.
     ready: function (cb) {
+      if (BIG) {
+        var op = window.opener;
+        if (!op) { lastError = 'Die Großansicht bitte über den Button im Jira-Panel öffnen.'; return cb(false); }
+        var done = false;
+        var timer = setTimeout(function () {
+          if (!done) { done = true; lastError = 'Keine Daten vom Jira-Panel erhalten. Großansicht erneut über den Button öffnen.'; cb(false); }
+        }, 8000);
+        window.addEventListener('message', function (e) {
+          if (done || e.source !== op || !e.data || e.data.type !== 'jp-data') return;
+          done = true; clearTimeout(timer);
+          cache = e.data.cache || {}; bigCtx = e.data.ctx || {};
+          cb(true);
+        });
+        op.postMessage({ type: 'jp-ready' }, target());
+        return;
+      }
       var tries = 0;
       (function check() {
         if (bridge()) return cb(true);
-        if (++tries > 50) return cb(false);
+        if (++tries > 50) { lastError = 'Adaptavist Bridge nicht verfügbar. Siehe Admin-Anleitung, Fehlerbehebung.'; return cb(false); }
         setTimeout(check, 200);
       })();
     },
     get: function (url) {
-      return Promise.resolve(bridge().request({ url: url, type: 'GET' })).then(parse);
+      if (BIG) {
+        return cache.hasOwnProperty(url) ? Promise.resolve(cache[url])
+          : Promise.reject({ status: 'Daten fehlen, Großansicht erneut öffnen' });
+      }
+      return Promise.resolve(bridge().request({ url: url, type: 'GET' })).then(parse).then(function (d) {
+        cache[url] = d; return d;
+      });
+    },
+    // Button "Großansicht" einrichten (im Panel sichtbar, in der Großansicht ausgeblendet)
+    bigButton: function (btn, onError) {
+      if (!btn) return;
+      if (BIG) { btn.style.display = 'none'; return; }
+      btn.onclick = function () {
+        var sep = window.location.search ? '&' : '?';
+        var url = window.location.href.split('#')[0].replace(/([?&])gross=1(&|$)/, '$1') + sep + 'gross=1';
+        var w = window.open(url, '_blank');
+        if (!w) { if (onError) onError('Neuer Tab wurde blockiert. Pop-ups für diese Seite erlauben.'); return; }
+        var handler = function (e) {
+          if (e.source !== w || !e.data || e.data.type !== 'jp-ready') return;
+          w.postMessage({ type: 'jp-data', cache: cache, ctx: ctx() }, target());
+        };
+        window.addEventListener('message', handler);
+      };
+    },
+    // Einstellungen: Standardwerte, überschrieben durch URL-Parameter (?name=wert)
+    config: function (defaults) {
+      var cfg = {}, params = null;
+      try { params = new URLSearchParams(window.location.search); } catch (e) {}
+      for (var k in defaults) {
+        var v = params ? params.get(k) : null;
+        cfg[k] = (v !== null && v !== '') ? v : defaults[k];
+      }
+      return cfg;
+    },
+    // Benutzerdefiniertes Feld finden: per ID, sonst per Name (mehrere Namen kommagetrennt).
+    // Bei gleichnamigen Feldern (team-managed) wird das Feld des Projekts bevorzugt.
+    resolveField: function (id, names, projectKey, schemaType, project) {
+      var self = this;
+      if (id) return Promise.resolve({ id: id });
+      var wanted = String(names || '').split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+      if (!wanted.length) return Promise.resolve(null);
+      var projP = project ? Promise.resolve(project) : self.get('/rest/api/3/project/' + encodeURIComponent(projectKey));
+      return Promise.all([projP, self.get('/rest/api/3/field')]).then(function (r) {
+        var projectId = String(r[0].id || '');
+        var list = Array.isArray(r[1]) ? r[1] : [];
+        for (var n = 0; n < wanted.length; n++) {
+          var cands = list.filter(function (f) {
+            return f.custom && String(f.name).toLowerCase() === wanted[n] &&
+                   (!schemaType || !f.schema || f.schema.type === schemaType);
+          });
+          var own = cands.filter(function (f) { return f.scope && f.scope.project && String(f.scope.project.id) === projectId; });
+          var glob = cands.filter(function (f) { return !f.scope; });
+          var hit = own[0] || glob[0];
+          if (hit) return hit;
+        }
+        return null;
+      });
     },
     projectKey: function () { return ctx().projectKey || ''; },
     issueKey: function () { return ctx().issueKey || ''; },
@@ -123,20 +215,24 @@ var Jira = (function () {
 })();
 
 (function () {
-  // ================= HIER ANPASSEN =================
-  var PROJECT_KEY    = '';         // leer = automatisch aus dem geöffneten Vorgang, sonst z. B. 'ABC'
-  var ISSUE_TYPE     = 'Task';     // Name des Vorgangstyps (bei deutscher Oberfläche ggf. 'Aufgabe')
-  var START_FIELD_ID = 10015;      // Zahl aus der ID des Feldes "Start date" (customfield_10015)
-  var CUSTOM_JQL     = '';         // optional: eigene JQL, {PROJECT} = Projektschlüssel (leer = automatisch)
-  var JIRA_URL       = '';         // Jira-Adresse für Links, z. B. 'https://firma.atlassian.net' (leer = automatisch)
-  var MONTHS_SHOWN   = 12;         // Anzahl Monate in der Kalenderansicht
-  var LINES_PER_DAY  = 3;          // max. Balken pro Tag, Rest als "+n"
-  // ================================================
-
-  var START_FIELD = 'customfield_' + START_FIELD_ID;
-  var JQL = CUSTOM_JQL ||
-    ('project = {PROJECT} AND issuetype = "' + ISSUE_TYPE + '"' +
-     ' AND (duedate is not EMPTY OR cf[' + START_FIELD_ID + '] is not EMPTY) ORDER BY duedate ASC');
+  // ============ EINSTELLUNGEN (Standardwerte) ============
+  // Hier muss nichts eingetragen werden. Abweichungen gibst du in der URL in ScriptRunner an,
+  // z. B. .../kalender/index.html?typ=Aufgabe&monate=18   (siehe Anleitung)
+  var DEFAULTS = {
+    projekt:   '',                          // leer = Projekt des geöffneten Vorgangs
+    typ:       'Task,Aufgabe',              // Vorgangstyp(en), der erste vorhandene Name wird genommen
+    startfeld: 'Start date,Startdatum',     // Name(n) oder ID des Startdatum-Feldes
+    filter:    '',                          // zusätzliche JQL-Bedingung, z. B. assignee = currentUser()
+    jira:      '',                          // Jira-Adresse für Links (leer = automatisch)
+    monate:    12,                          // Anzahl Monate in der Kalenderansicht
+    zeilen:    3                            // max. Striche pro Tag, Rest als "+n"
+  };
+  // ========================================================
+  var CFG = Jira.config(DEFAULTS);
+  var JIRA_URL = CFG.jira;
+  var MONTHS_SHOWN = Math.min(36, Math.max(1, parseInt(CFG.monate, 10) || 12));
+  var LINES_PER_DAY = Math.min(10, Math.max(1, parseInt(CFG.zeilen, 10) || 3));
+  var START_FIELD = '';
 
   var COLOR = { 'new': '#8993a4', indeterminate: '#2a78d6', done: '#1f845a', overdue: '#c9372c' };
   var MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -175,17 +271,39 @@ var Jira = (function () {
 
   function start() {
     Jira.ready(function (ok) {
-      if (!ok) { fail('Adaptavist Bridge nicht verfügbar. Siehe Admin-Anleitung, Fehlerbehebung.'); return; }
-      var key = PROJECT_KEY || Jira.projectKey();
-      if (JQL.indexOf('{PROJECT}') >= 0 && !key) { fail('Projektschlüssel unbekannt. PROJECT_KEY im Skript eintragen.'); return; }
-      jql = JQL.split('{PROJECT}').join(key);
-      load();
+      if (!ok) { fail(Jira.error()); return; }
+      var key = CFG.projekt || Jira.projectKey();
+      if (!key) { fail('Projektschlüssel unbekannt. In der ScriptRunner-URL ?projekt=ABC anhängen.'); return; }
+      var typeNames = String(CFG.typ).split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+      Jira.get('/rest/api/3/project/' + encodeURIComponent(key)).then(function (proj) {
+        var types = proj.issueTypes || [];
+        var type = null;
+        for (var n = 0; n < typeNames.length && !type; n++) {
+          for (var t = 0; t < types.length; t++) {
+            if (String(types[t].name).toLowerCase() === typeNames[n]) { type = types[t]; break; }
+          }
+        }
+        if (!type) {
+          fail('Vorgangstyp "' + CFG.typ + '" im Projekt nicht gefunden. Vorhanden: ' +
+               types.map(function (x) { return x.name; }).join(', ') + '. In der ScriptRunner-URL ?typ=... angeben.');
+          return null;
+        }
+        return Jira.resolveField(/^customfield_\d+$/.test(CFG.startfeld) ? CFG.startfeld : '',
+                                 CFG.startfeld, key, 'date', proj).then(function (f) {
+          var dateCond = 'duedate is not EMPTY';
+          if (f) { START_FIELD = f.id; dateCond = '(duedate is not EMPTY OR cf[' + f.id.replace('customfield_', '') + '] is not EMPTY)'; }
+          else { $('jk-msg').textContent = 'Hinweis: Startdatum-Feld nicht gefunden, es wird nur das Fälligkeitsdatum verwendet.'; }
+          jql = 'project = "' + key + '" AND issuetype = ' + type.id + ' AND ' + dateCond +
+                (CFG.filter ? ' AND (' + CFG.filter + ')' : '') + ' ORDER BY duedate ASC';
+          load();
+        });
+      }).then(null, function (err) { fail('Projektdaten konnten nicht geladen werden (Status ' + Jira.status(err) + ').'); });
     });
   }
 
   function load(token) {
     var url = '/rest/api/3/search/jql?jql=' + encodeURIComponent(jql) +
-              '&fields=summary,status,duedate,' + START_FIELD + '&maxResults=100';
+              '&fields=summary,status,duedate' + (START_FIELD ? ',' + START_FIELD : '') + '&maxResults=100';
     if (token) url += '&nextPageToken=' + encodeURIComponent(token);
     Jira.get(url).then(
       function (data) {
@@ -231,7 +349,7 @@ var Jira = (function () {
   function openIssue(key) {
     var base = Jira.baseUrl(JIRA_URL);
     if (base) window.open(base + '/browse/' + key, '_blank');
-    else $('jk-msg').textContent = 'Vorgang ' + key + ' konnte nicht geöffnet werden (JIRA_URL im Skript eintragen).';
+    else $('jk-msg').textContent = 'Vorgang ' + key + ' konnte nicht geöffnet werden. In der ScriptRunner-URL ?jira=https://firma.atlassian.net anhängen.';
   }
 
   function issueLink(ev) {
@@ -351,6 +469,7 @@ var Jira = (function () {
   function render() {
     var last = addMonths(winStart, MONTHS_SHOWN - 1);
     $('jk-title').textContent = monthLabel(winStart) + ' – ' + monthLabel(last);
+    $('jk-vcal').textContent = MONTHS_SHOWN + (MONTHS_SHOWN === 1 ? ' Monat' : ' Monate');
     $('jk-vcal').className = view === 'cal' ? 'on' : '';
     $('jk-vlist').className = view === 'list' ? 'on' : '';
     var v = $('jk-view'); v.innerHTML = '';
@@ -365,6 +484,7 @@ var Jira = (function () {
   $('jk-vlist').onclick = function () { view = 'list'; render(); };
 
   render();
+  Jira.bigButton($('jk-big'), function (t) { $('jk-msg').textContent = t; });
   start();
 })();
 </script>
