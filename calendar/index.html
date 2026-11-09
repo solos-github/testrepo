@@ -99,6 +99,30 @@ var Jira = (function () {
 
   function bridge() { return window.AdaptavistBridge && window.AdaptavistBridge.request ? window.AdaptavistBridge : null; }
   function ctx() { return bigCtx || (window.AdaptavistBridgeContext && window.AdaptavistBridgeContext.context) || {}; }
+  var resolvedKey = '';
+  // Wert aus Objekt lesen, auch verschachtelt ("project.key") oder als Unterobjekt
+  function pick(obj, names) {
+    if (!obj) return '';
+    for (var i = 0; i < names.length; i++) {
+      var n = names[i];
+      if (obj[n]) return String(obj[n]);
+      var parts = n.split('.'), v = obj;
+      for (var j = 0; j < parts.length && v; j++) v = v[parts[j]];
+      if (v && typeof v !== 'object') return String(v);
+    }
+    return '';
+  }
+  function urlParam(names) {
+    try {
+      var p = new URLSearchParams(window.location.search);
+      for (var i = 0; i < names.length; i++) if (p.get(names[i])) return p.get(names[i]);
+    } catch (e) {}
+    return '';
+  }
+  function issueFromText(t) {
+    var m = /(?:\/browse\/|selectedIssue=)([A-Z][A-Z0-9_]*-\d+)/i.exec(t || '');
+    return m ? m[1] : '';
+  }
   function target() { return window.location.origin && window.location.origin !== 'null' ? window.location.origin : '*'; }
 
   function parse(d) {
@@ -196,7 +220,9 @@ var Jira = (function () {
         }
         var handler = function (e) {
           if (e.source !== w || !e.data || e.data.type !== 'jp-ready') return;
-          w.postMessage({ type: 'jp-data', cache: cache, ctx: ctx() }, target());
+          var c = {}; var src = ctx(); for (var k in src) c[k] = src[k];
+          if (resolvedKey) c.projectKey = resolvedKey;
+          w.postMessage({ type: 'jp-data', cache: cache, ctx: c }, target());
         };
         window.addEventListener('message', handler);
       };
@@ -235,8 +261,41 @@ var Jira = (function () {
         return null;
       });
     },
-    projectKey: function () { return ctx().projectKey || ''; },
-    issueKey: function () { return ctx().issueKey || ''; },
+    projectKey: function () { return resolvedKey || pick(ctx(), ['projectKey', 'project.key']) || ''; },
+    issueKey: function () { return pick(ctx(), ['issueKey', 'issue.key']) || ''; },
+    // Projektschlüssel ermitteln: Einstellung > Kontext > Vorgang (Kontext/URL/Referrer) > aktueller Vorgang
+    // Wartet bis zu 5 Sekunden, weil ScriptRunner den Kontext evtl. verzögert setzt.
+    resolveProject: function (configured) {
+      var self = this;
+      if (configured) { resolvedKey = configured; return Promise.resolve(configured); }
+      return new Promise(function (resolve) {
+        var tries = 0;
+        (function wait() {
+          var c = ctx();
+          if (pick(c, ['projectKey', 'project.key']) || pick(c, ['issueKey', 'issue.key']) || ++tries > 25) return resolve();
+          setTimeout(wait, 200);
+        })();
+      }).then(function () {
+        var c = ctx();
+        var pk = pick(c, ['projectKey', 'project.key']) || urlParam(['projectKey', 'project.key', 'projectkey', 'project_key']);
+        if (pk) return pk;
+        var ik = pick(c, ['issueKey', 'issue.key']) || urlParam(['issueKey', 'issue.key', 'issuekey', 'issue_key']) || issueFromText(document.referrer);
+        if (ik) {
+          var m = /^([A-Z][A-Z0-9_]*)-\d+$/i.exec(ik);
+          return self.get('/rest/api/3/issue/' + encodeURIComponent(ik) + '?fields=project').then(function (d) {
+            return (d.fields && d.fields.project && d.fields.project.key) || (m ? m[1].toUpperCase() : '');
+          }, function () { return m ? m[1].toUpperCase() : ''; });
+        }
+        return '';
+      }).then(function (key) { resolvedKey = key || ''; return resolvedKey; });
+    },
+    // Was ScriptRunner übergibt (für Fehlermeldungen)
+    contextInfo: function () {
+      var info = {};
+      try { info = JSON.parse(JSON.stringify(ctx())); } catch (e) {}
+      info.urlParameter = window.location.search || '(keine)';
+      return JSON.stringify(info).slice(0, 300);
+    },
     status: function (err) {
       if (!err) return '?';
       return err.status || (err.xhr && err.xhr.status) || (err.err && err.err.status) || err.message || '?';
@@ -311,8 +370,8 @@ var Jira = (function () {
   function start() {
     Jira.ready(function (ok) {
       if (!ok) { fail(Jira.error()); return; }
-      var key = CFG.projekt || Jira.projectKey();
-      if (!key) { fail('Projektschlüssel unbekannt. In der ScriptRunner-URL ?projekt=ABC anhängen.'); return; }
+      Jira.resolveProject(CFG.projekt).then(function (key) {
+      if (!key) { fail('Projektschlüssel unbekannt. In der ScriptRunner-URL ?projekt=ABC anhängen. (Von ScriptRunner erhalten: ' + Jira.contextInfo() + ')'); return; }
       var typeNames = String(CFG.typ).split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
       Jira.get('/rest/api/3/project/' + encodeURIComponent(key)).then(function (proj) {
         var types = proj.issueTypes || [];
@@ -337,6 +396,7 @@ var Jira = (function () {
           load();
         });
       }).then(null, function (err) { fail('Projektdaten konnten nicht geladen werden (Status ' + Jira.status(err) + ').'); });
+      });
     });
   }
 
