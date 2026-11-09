@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Budget und Jahreskalender</title>
+<!-- Budget-Übersicht und Jahreskalender in EINEM ScriptRunner Web Panel (Single URL).
+     Für Stellen, an denen ScriptRunner nur ein Fragment anzeigt.
+     Einstellungen: nichts eintragen, Abweichungen per URL-Parameter (siehe EINSTELLUNGEN.md). -->
+<style>
+html, body { margin: 0; padding: 0; background: #ffffff; }
+  .bw { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 16px; max-width: 760px; }
+  .bw h2 { margin: 0 0 4px; font-size: 14px; font-weight: 500; color: #626f86; }
+  .bw .total { margin: 0 0 16px; font-size: 28px; font-weight: 600; }
+  .bw .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .bw svg { width: 280px; height: 280px; flex-shrink: 0; }
+  .bw svg path, .bw svg circle { cursor: default; transition: opacity .15s; }
+  .bw svg:hover path, .bw svg:hover circle.slice { opacity: .55; }
+  .bw svg path:hover, .bw svg circle.slice:hover { opacity: 1; }
+  .bw table { border-collapse: collapse; flex: 1; min-width: 280px; font-size: 14px; }
+  .bw td, .bw th { padding: 6px 8px; border-bottom: 1px solid #dfe1e6; text-align: left; }
+  .bw th { color: #626f86; font-weight: 500; }
+  .bw .num { text-align: right; white-space: nowrap; }
+  .bw .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 0; }
+  .bw tfoot td { font-weight: 600; border-bottom: none; }
+  .bw .msg { color: #c9372c; margin-top: 8px; }
+  .bw .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 4px; }
+  .bw .head h2 { margin: 0; }
+  .big-btn { font: inherit; font-size: 12px; padding: 4px 10px; border: 1px solid #c1c7d0; background: #fff; color: #172b4d; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+  .big-btn:hover { background: #f1f2f4; }
+  html.gross .bw { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+  html.gross .bw .total { font-size: 36px; }
+  html.gross .bw svg { width: 440px; height: 440px; }
+  html.gross .bw table { font-size: 15px; }
+  .jp-title { font: 600 16px -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px 16px 0;
+              padding-bottom: 8px; border-bottom: 1px solid #dfe1e6; display: flex; align-items: center; gap: 8px; }
+  .jp-title .ico { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+  html.gross .jp-title { max-width: 1100px; margin: 20px auto 0; padding-left: 24px; padding-right: 24px; font-size: 20px; }
+  .jk { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px; font-size: 13px; }
+  .jk button { font: inherit; padding: 5px 12px; border: 1px solid #c1c7d0; background: #fff; color: #172b4d; border-radius: 4px; cursor: pointer; }
+  .jk button:hover { background: #f1f2f4; }
+  .jk button.on { background: #e9f2ff; border-color: #0c66e4; color: #0c66e4; }
+  .jk .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .jk .title { font-size: 16px; font-weight: 600; margin: 0 8px; min-width: 200px; }
+  .jk .sp { flex: 1; }
+  .jk .legend { display: flex; flex-wrap: wrap; gap: 14px; color: #626f86; margin-bottom: 10px; }
+  .jk .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+  .jk .status { color: #626f86; margin-bottom: 8px; }
+  .jk .msg { color: #c9372c; margin-bottom: 8px; }
+  .jk .months { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .jk .month { border: 1px solid #dfe1e6; border-radius: 6px; padding: 8px; }
+  .jk .mname { font-weight: 600; margin: 0 0 6px 2px; }
+  
+  .jk .wd, .jk .kw { color: #8590a2; font-size: 11px; text-align: center; }
+  .jk .kw { padding-top: 3px; }
+  .jk .day { min-height: 34px; border-radius: 3px; padding: 2px 2px 3px; cursor: pointer; background: #fafbfc; }
+  .jk .day:hover { background: #f1f2f4; }
+  .jk .day.empty { background: transparent; cursor: default; }
+  .jk .day.we { background: #f4f5f7; }
+  .jk .day .n { font-size: 11px; color: #44546f; text-align: right; line-height: 1.2; }
+  .jk .day.today .n { color: #fff; background: #0c66e4; border-radius: 8px; display: inline-block; float: right; padding: 0 4px; }
+  .jk .day.sel { outline: 2px solid #0c66e4; }
+  .jk .lines { clear: both; display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+  .jk .ln { height: 4px; border-radius: 2px; }
+  .jk .more { font-size: 10px; color: #626f86; text-align: right; line-height: 1; }
+  .jk .detail { margin-top: 16px; border: 1px solid #dfe1e6; border-radius: 6px; padding: 10px 12px; }
+  .jk .detail h3 { margin: 0 0 8px; font-size: 14px; }
+  .jk table { border-collapse: collapse; width: 100%; }
+  .jk td, .jk th { padding: 6px 8px; border-bottom: 1px solid #dfe1e6; text-align: left; vertical-align: top; }
+  .jk th { color: #626f86; font-weight: 500; }
+  .jk td.nw { white-space: nowrap; }
+  .jk .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 8px; vertical-align: -1px; }
+  .jk a.issue { color: #0c66e4; text-decoration: none; cursor: pointer; }
+  .jk a.issue:hover { text-decoration: underline; }
+  .jk .mhead td { background: #f4f5f7; font-weight: 600; }
+  .jk .tw { overflow-x: auto; }
+  @media (max-width: 520px) {
+    .jk { margin: 8px; font-size: 12px; }
+    .jk .title { min-width: 0; width: 100%; order: 10; margin: 4px 0 0; font-size: 14px; }
+    .jk td, .jk th { padding: 5px 6px; }
+    .jk .months { gap: 10px; }
+  }
+  .jk .big-btn { font-size: 13px; }
+  html.gross .jk { max-width: 1600px; margin: 20px auto; padding: 0 20px; font-size: 14px; }
+  html.gross .jk .months { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  html.gross .jk .day { min-height: 44px; }
+  html.gross .jk .day .n { font-size: 12px; }
+  html.gross .jk .ln { height: 5px; }
+  .jk .whead { display: grid; grid-template-columns: 22px repeat(7, minmax(0, 1fr)); gap: 0 2px; margin-bottom: 2px; }
+  .jk .week { display: grid; grid-template-columns: 22px repeat(7, minmax(0, 1fr)); gap: 0 2px; margin-bottom: 2px; position: relative; }
+  .jk .week .day { min-height: 0; position: relative; }
+  .jk .week .day .more { position: absolute; right: 3px; bottom: 1px; font-size: 10px; }
+  .jk .ev { position: relative; z-index: 1; align-self: center; height: 16px; line-height: 16px; margin: 0 1px; padding: 0 5px;
+            border-radius: 3px; color: #fff; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .jk .ev:hover { filter: brightness(0.92); }
+  .jk .ev.cont-l { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
+  .jk .ev.cont-r { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: -1px; }
+  html.gross .jk .ev { font-size: 12px; }
+  .jp-title { font: 600 16px -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px 16px 0;
+              padding-bottom: 8px; border-bottom: 1px solid #dfe1e6; display: flex; align-items: center; gap: 8px; }
+  .jp-title .ico { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+  html.gross .jp-title { max-width: 1600px; margin: 20px auto 0; padding-left: 24px; padding-right: 24px; font-size: 20px; }
+  /* Panel: nur Überschriften */
+  html:not(.gross) .jp-sec .big-btn { display: none; }
+  html:not(.gross) .jp-sec > :not(.jp-title):not(.jp-note) { display: none; }
+  .jp-sec > .jp-title { cursor: pointer; user-select: none; margin: 10px 12px 0; padding: 10px 12px; border: 1px solid #dfe1e6;
+                        border-radius: 6px; font-size: 15px; }
+  .jp-sec > .jp-title:hover, .jp-sec > .jp-title:focus { background: #f1f2f4; outline: none; border-color: #c1c7d0; }
+  .jp-info { margin-left: auto; font-weight: 400; font-size: 13px; color: #626f86; white-space: nowrap; }
+  .jp-open { color: #0c66e4; font-weight: 400; font-size: 15px; }
+  .jp-note { margin: 4px 14px 0; font: 12px -apple-system, "Segoe UI", Roboto, sans-serif; color: #c9372c; }
+  .jp-note:empty { display: none; }
+
+  /* Großansicht (Tab oder Vollbild): gewählter Bereich komplett */
+  html.gross .jp-sec > .jp-note, html.gross .jp-sec .jp-info, html.gross .jp-sec .jp-open { display: none; }
+  html.gross .jp-sec > .jp-title { cursor: default; border: 0; border-bottom: 1px solid #dfe1e6; border-radius: 0; background: none; }
+  html.gross.nur-budget #sec-kalender, html.gross.nur-kalender #sec-budget { display: none; }
+</style>
+</head>
+<body>
+<div id="jp-projbar"></div>
+<section class="jp-sec" id="sec-budget">
+<div class="jp-title"><span class="ico" style="background:#2a78d6"></span>Budget-Übersicht</div>
+<div class="bw">
+  <div class="head"><h2>Budget gesamt</h2><button class="big-btn" id="bw-big" title="In einem neuen Tab über die ganze Breite anzeigen">&#x2922; Großansicht</button></div>
+  <p class="total" id="bw-total">Lade …</p>
+  <div class="row">
+    <svg id="bw-pie" viewBox="-1.05 -1.05 2.1 2.1" role="img" aria-label="Kreisdiagramm der Budgets in Euro"></svg>
+    <table id="bw-tbl" style="display:none">
+      <thead><tr><th>Position</th><th class="num">Budget</th><th class="num">Anteil</th></tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><td>Summe</td><td class="num" id="bw-sum"></td><td class="num">100 %</td></tr></tfoot>
+    </table>
+  </div>
+  <p class="msg" id="bw-msg"></p>
+</div>
+</section>
+<section class="jp-sec" id="sec-kalender">
+<div class="jp-title"><span class="ico" style="background:#1f845a"></span>Jahreskalender</div>
+<div class="jk">
+  <div class="bar">
+    <button id="jk-prev" title="Einen Monat zurück">&#8249;</button>
+    <button id="jk-next" title="Einen Monat vor">&#8250;</button>
+    <button id="jk-today">Heute</button>
+    <span class="title" id="jk-title"></span>
+    <span class="sp"></span>
+    <button id="jk-vcal" class="on">12 Monate</button>
+    <button id="jk-vlist">Liste</button>
+    <button class="big-btn" id="jk-big" title="In einem neuen Tab über die ganze Breite anzeigen">&#x2922; Großansicht</button>
+  </div>
+  <div class="legend">
+    <span><i style="background:#626f86"></i>Offen</span>
+    <span><i style="background:#2a78d6"></i>In Arbeit</span>
+    <span><i style="background:#1f845a"></i>Erledigt</span>
+    <span><i style="background:#c9372c"></i>Überfällig</span>
+  </div>
+  <div class="status" id="jk-status">Lade Vorgänge …</div>
+  <div class="msg" id="jk-msg"></div>
+  <div id="jk-view"></div>
+  <div id="jk-detail"></div>
+</div>
+</section>
+
+<script src="https://assets.hydrogen.sagittarius.connect.product.adaptavist.com/public/js/bridge.js"></script>
+<script>
+/* Verbindung zu Jira über die Adaptavist Bridge (ScriptRunner Cloud Web Panel) */
+/* Großansicht: Das Panel öffnet sich selbst in einem neuen Tab (?gross=1) und übergibt dort
+   die bereits geladenen Daten direkt im Browser (postMessage). Die Daten gehen dabei weder
+   über den Webserver noch in die URL. */
+var Jira = (function () {
+  var BIG = /[?&]gross=1(&|$)/.test(window.location.search);
+  var cache = {};          // im Panel: geladene Antworten; in der Großansicht: übergebene Antworten
+  var bigCtx = null;       // Kontext (Projekt) in der Großansicht
+  var lastError = '';
+
+  function bridge() { return window.AdaptavistBridge && window.AdaptavistBridge.request ? window.AdaptavistBridge : null; }
+  function ctx() { return bigCtx || (window.AdaptavistBridgeContext && window.AdaptavistBridgeContext.context) || {}; }
+  var resolvedKey = '';
+  // Wert aus Objekt lesen, auch verschachtelt ("project.key") oder als Unterobjekt
+  function pick(obj, names) {
+    if (!obj) return '';
+    for (var i = 0; i < names.length; i++) {
+      var n = names[i];
+      if (obj[n]) return String(obj[n]);
+      var parts = n.split('.'), v = obj;
+      for (var j = 0; j < parts.length && v; j++) v = v[parts[j]];
+      if (v && typeof v !== 'object') return String(v);
+    }
+    return '';
+  }
+  function urlParam(names) {
+    try {
+      var p = new URLSearchParams(window.location.search);
+      for (var i = 0; i < names.length; i++) if (p.get(names[i])) return p.get(names[i]);
+    } catch (e) {}
+    return '';
+  }
+  var source = '';
+  var inflight = 0;
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+  function onFsChangeGlobal() {
+    var root = document.documentElement, on = !!fsElement();
+    if (on) { if (!/\bgross\b/.test(root.className)) root.className += ' gross'; }
+    else root.className = root.className.replace(/\s*\bgross\b/g, '');
+    try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+  }
+  if (!BIG) {
+    document.addEventListener('fullscreenchange', onFsChangeGlobal);
+    document.addEventListener('webkitfullscreenchange', onFsChangeGlobal);
+  }
+  var resolveP = null, askP = null;
+  // Kontext über die Atlassian-Schnittstelle AP (falls die Bridge sie bereitstellt), max. 2 Sekunden
+  function apContext() {
+    return new Promise(function (resolve) {
+      var AP = window.AP, done = false;
+      if (!AP || !AP.context || !AP.context.getContext) return resolve({});
+      var t = setTimeout(function () { if (!done) { done = true; resolve({}); } }, 2000);
+      try {
+        var r = AP.context.getContext(function (c) { if (!done) { done = true; clearTimeout(t); resolve(c || {}); } });
+        if (r && r.then) r.then(function (c) { if (!done) { done = true; clearTimeout(t); resolve(c || {}); } }, function () {});
+      } catch (e) { done = true; clearTimeout(t); resolve({}); }
+    });
+  }
+  // Atlassian-Rahmen legen Angaben teils als JSON im Fensternamen ab
+  function windowNameInfo() {
+    try { return window.name ? JSON.parse(window.name) : {}; } catch (e) { return {}; }
+  }
+  function deepFind(obj, names, depth) {
+    if (!obj || typeof obj !== 'object' || (depth || 0) > 6) return '';
+    var direct = pick(obj, names); if (direct) return direct;
+    for (var k in obj) {
+      var v = obj[k];
+      if (typeof v === 'string' && v.charAt(0) === '{') { try { v = JSON.parse(v); } catch (e) {} }
+      var r = deepFind(v, names, (depth || 0) + 1); if (r) return r;
+    }
+    return '';
+  }
+  // Browser-Speicher (kann in eingeschränkten Rahmen gesperrt sein)
+  function store(k, v) {
+    try {
+      if (v === undefined) return window.localStorage.getItem(k) || '';
+      if (v === null) window.localStorage.removeItem(k); else window.localStorage.setItem(k, v);
+    } catch (e) {}
+    return '';
+  }
+  function projectBar() {
+    var box = document.getElementById('jp-projbar');
+    var css = 'font: 13px -apple-system, "Segoe UI", Roboto, sans-serif; color: #44546f; margin: 12px 16px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;';
+    if (box && !box.style.cssText) box.style.cssText = css;
+    if (!box) {
+      box = document.createElement('div'); box.id = 'jp-projbar';
+      box.style.cssText = css;
+      var title = document.querySelector('.jp-title');
+      if (title && title.nextSibling) document.body.insertBefore(box, title.nextSibling);
+      else document.body.insertBefore(box, document.body.firstChild);
+    }
+    return box;
+  }
+  function issueFromText(t) {
+    var m = /(?:\/browse\/|selectedIssue=)([A-Z][A-Z0-9_]*-\d+)/i.exec(t || '');
+    return m ? m[1] : '';
+  }
+  function target() { return window.location.origin && window.location.origin !== 'null' ? window.location.origin : '*'; }
+
+  function parse(d) {
+    if (d && typeof d === 'object' && d.body !== undefined && !d.issues) d = d.body;
+    if (typeof d === 'string') d = JSON.parse(d);
+    return d || {};
+  }
+
+  if (BIG) document.documentElement.className += ' gross';
+
+  return {
+    isBig: BIG,
+    error: function () { return lastError; },
+    // Panel: wartet bis zu 10 Sekunden auf die Bridge. Großansicht: holt die Daten vom Panel.
+    ready: function (cb) {
+      if (BIG) {
+        var op = window.opener;
+        if (!op) { lastError = 'Die Großansicht bitte über den Button im Jira-Panel öffnen.'; return cb(false); }
+        var done = false;
+        var timer = setTimeout(function () {
+          if (!done) { done = true; lastError = 'Keine Daten vom Jira-Panel erhalten. Großansicht erneut über den Button öffnen.'; cb(false); }
+        }, 8000);
+        window.addEventListener('message', function (e) {
+          if (done || e.source !== op || !e.data || e.data.type !== 'jp-data') return;
+          done = true; clearTimeout(timer);
+          cache = e.data.cache || {}; bigCtx = e.data.ctx || {};
+          cb(true);
+        });
+        op.postMessage({ type: 'jp-ready' }, target());
+        return;
+      }
+      var tries = 0;
+      (function check() {
+        if (bridge()) return cb(true);
+        if (++tries > 50) { lastError = 'Adaptavist Bridge nicht verfügbar. Siehe Admin-Anleitung, Fehlerbehebung.'; return cb(false); }
+        setTimeout(check, 200);
+      })();
+    },
+    get: function (url) {
+      if (BIG) {
+        return cache.hasOwnProperty(url) ? Promise.resolve(cache[url])
+          : Promise.reject({ status: 'Daten fehlen, Großansicht erneut öffnen' });
+      }
+      inflight++;
+      return Promise.resolve(bridge().request({ url: url, type: 'GET' })).then(parse).then(function (d) {
+        inflight--; cache[url] = d; return d;
+      }, function (err) { inflight--; throw err; });
+    },
+    // Button "Großansicht" einrichten (im Panel sichtbar, in der Großansicht ausgeblendet)
+    // 1. Versuch: neuer Tab. 2. Versuch (falls der Rahmen keine neuen Fenster erlaubt): Vollbild.
+    // Großansicht öffnen: neuer Tab, sonst Vollbild. extra = zusätzliche URL-Parameter (z. B. 'ansicht=budget'),
+    // beforeFs = Funktion, die vor dem Vollbild aufgerufen wird (z. B. um nur einen Bereich zu zeigen).
+    openBig: function (extra, onError, beforeFs) {
+      var root = document.documentElement;
+      if (onError) onError('');
+      if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+      var base = window.location.href.split('#')[0].replace(/([?&])(gross|ansicht)=[^&]*/g, '$1').replace(/[?&]+$/, '').replace(/\?&+/, '?');
+      var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'gross=1' + (extra ? '&' + extra : '');
+      var w = null;
+      try { w = window.open(url, '_blank'); } catch (e) { w = null; }
+      if (!w) {
+        var req = root.requestFullscreen || root.webkitRequestFullscreen;
+        var enabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+        var msg = 'Großansicht nicht möglich: ScriptRunner erlaubt im Panel weder neue Tabs noch Vollbild. Tipp: Vorgang in der Vollansicht öffnen und die Seitenleiste breiter ziehen.';
+        if (!req || !enabled) { if (onError) onError(msg); return; }
+        if (beforeFs) beforeFs();
+        try {
+          var p = req.call(root);
+          if (p && p.catch) p.catch(function () { if (onError) onError(msg); });
+        } catch (e) { if (onError) onError(msg); }
+        return;
+      }
+      window.addEventListener('message', function handler(e) {
+        if (e.source !== w || !e.data || e.data.type !== 'jp-ready') return;
+        window.removeEventListener('message', handler);
+        var tries = 0;
+        (function send() {
+          // laufende Abfragen erst abschließen lassen (max. 15 Sekunden)
+          if (inflight > 0 && ++tries < 150) return setTimeout(send, 100);
+          var c = {}; var src = ctx(); for (var k in src) c[k] = src[k];
+          if (resolvedKey) c.projectKey = resolvedKey;
+          w.postMessage({ type: 'jp-data', cache: cache, ctx: c }, target());
+        })();
+      });
+    },
+    // Button "Großansicht" einrichten (im Panel sichtbar, in der Großansicht ausgeblendet)
+    bigButton: function (btn, onError) {
+      if (!btn) return;
+      if (BIG) { btn.style.display = 'none'; return; }
+      var self = this, label = btn.innerHTML;
+      function onFsChange() {
+        var on = !!fsElement();
+        btn.innerHTML = on ? '&#x2715; Vollbild beenden' : label;
+        btn.title = on ? 'Vollbild beenden (oder Esc)' : 'Große Ansicht öffnen';
+      }
+      document.addEventListener('fullscreenchange', onFsChange);
+      document.addEventListener('webkitfullscreenchange', onFsChange);
+      btn.onclick = function () { self.openBig('', onError); };
+    },
+    isFullscreen: function () { return !!fsElement(); },
+    // Einstellungen: Standardwerte, überschrieben durch URL-Parameter (?name=wert)
+    config: function (defaults) {
+      var cfg = {}, params = null;
+      try { params = new URLSearchParams(window.location.search); } catch (e) {}
+      for (var k in defaults) {
+        var v = params ? params.get(k) : null;
+        cfg[k] = (v !== null && v !== '') ? v : defaults[k];
+      }
+      return cfg;
+    },
+    // Benutzerdefiniertes Feld finden: per ID, sonst per Name (mehrere Namen kommagetrennt).
+    // Bei gleichnamigen Feldern (team-managed) wird das Feld des Projekts bevorzugt.
+    resolveField: function (id, names, projectKey, schemaType, project) {
+      var self = this;
+      if (id) return Promise.resolve({ id: id });
+      var wanted = String(names || '').split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+      if (!wanted.length) return Promise.resolve(null);
+      var projP = project ? Promise.resolve(project) : self.get('/rest/api/3/project/' + encodeURIComponent(projectKey));
+      return Promise.all([projP, self.get('/rest/api/3/field')]).then(function (r) {
+        var projectId = String(r[0].id || '');
+        var list = Array.isArray(r[1]) ? r[1] : [];
+        for (var n = 0; n < wanted.length; n++) {
+          var cands = list.filter(function (f) {
+            return f.custom && String(f.name).toLowerCase() === wanted[n] &&
+                   (!schemaType || !f.schema || f.schema.type === schemaType);
+          });
+          var own = cands.filter(function (f) { return f.scope && f.scope.project && String(f.scope.project.id) === projectId; });
+          var glob = cands.filter(function (f) { return !f.scope; });
+          var hit = own[0] || glob[0];
+          if (hit) return hit;
+        }
+        return null;
+      });
+    },
+    projectKey: function () { return resolvedKey || pick(ctx(), ['projectKey', 'project.key']) || ''; },
+    issueKey: function () { return pick(ctx(), ['issueKey', 'issue.key']) || ''; },
+    // Projektschlüssel ermitteln: Einstellung > Kontext > Vorgang (Kontext/URL/Referrer) > aktueller Vorgang
+    // Wartet bis zu 5 Sekunden, weil ScriptRunner den Kontext evtl. verzögert setzt.
+    resolveProject: function (configured) {
+      if (!resolveP) resolveP = this._resolveProject(configured);
+      return resolveP;
+    },
+    _resolveProject: function (configured) {
+      var self = this;
+      if (configured) { resolvedKey = configured; return Promise.resolve(configured); }
+      var apc = {}, apDone = false;
+      apContext().then(function (c) { apc = c || {}; apDone = true; });
+      // gespeichertes Projekt vorhanden: nur kurz warten, sonst bis zu 5 Sekunden
+      var maxTries = store('jp-projekt') ? 5 : 25;
+      function found() {
+        var c = ctx(), wn = windowNameInfo();
+        return pick(c, ['projectKey', 'project.key', 'issueKey', 'issue.key']) ||
+               pick(apc, ['jira.project.key', 'jira.issue.key', 'project.key', 'issue.key']) ||
+               deepFind(wn, ['project.key', 'projectKey', 'issue.key', 'issueKey']) ||
+               urlParam(['projekt', 'projectKey', 'project.key', 'issueKey', 'issue.key']) ||
+               issueFromText(document.referrer);
+      }
+      return new Promise(function (resolve) {
+        var tries = 0;
+        (function wait() {
+          if (found() || ++tries > maxTries) return resolve();
+          setTimeout(wait, 200);
+        })();
+      }).then(function () {
+        // AP-Kontext evtl. noch unterwegs: höchstens bis zu dessen eigenem Zeitlimit warten
+        return apDone ? apc : apContext();
+      }).then(function (apc2) {
+        var apc = apc2 || {};
+        var c = ctx(), wn = windowNameInfo();
+        var pk = pick(c, ['projectKey', 'project.key']) || pick(apc, ['jira.project.key', 'project.key']) ||
+                 deepFind(wn, ['project.key', 'projectKey']) ||
+                 urlParam(['projekt', 'projectKey', 'project.key', 'projectkey', 'project_key']);
+        if (pk) { source = 'Kontext'; return pk; }
+        var ik = pick(c, ['issueKey', 'issue.key']) || pick(apc, ['jira.issue.key', 'issue.key']) ||
+                 deepFind(wn, ['issue.key', 'issueKey']) ||
+                 urlParam(['issueKey', 'issue.key', 'issuekey', 'issue_key']) || issueFromText(document.referrer);
+        if (ik) {
+          source = 'Vorgang ' + ik;
+          var m = /^([A-Z][A-Z0-9_]*)-\d+$/i.exec(ik);
+          return self.get('/rest/api/3/issue/' + encodeURIComponent(ik) + '?fields=project').then(function (d) {
+            return (d.fields && d.fields.project && d.fields.project.key) || (m ? m[1].toUpperCase() : '');
+          }, function () { return m ? m[1].toUpperCase() : ''; });
+        }
+        var saved = store('jp-projekt');
+        if (saved) { source = 'gespeichert'; return saved; }
+        return '';
+      }).then(function (key) { resolvedKey = key || ''; return resolvedKey; });
+    },
+    // Woher das Projekt stammt ('Kontext', 'Vorgang …', 'gespeichert', 'Auswahl')
+    projectSource: function () { return source; },
+    // Projektauswahl anzeigen, wenn kein Projekt ermittelt werden konnte. Liefert den gewählten Schlüssel.
+    askProject: function () {
+      if (!askP) askP = this._askProject();
+      return askP;
+    },
+    _askProject: function () {
+      var self = this;
+      return new Promise(function (resolve) {
+        var box = projectBar();
+        box.innerHTML = '';
+        var lbl = document.createElement('span'); lbl.textContent = 'Projekt wählen: ';
+        var sel = document.createElement('select'); sel.disabled = true;
+        var opt0 = document.createElement('option'); opt0.textContent = 'Lade Projekte …'; sel.appendChild(opt0);
+        var ok = document.createElement('button'); ok.textContent = 'Anzeigen'; ok.disabled = true;
+        box.appendChild(lbl); box.appendChild(sel); box.appendChild(ok);
+        var hint = document.createElement('div'); hint.className = 'jp-hint';
+        hint.textContent = 'Das Panel konnte das Projekt nicht automatisch erkennen. Die Auswahl wird in diesem Browser gespeichert.';
+        hint.style.cssText = 'width: 100%; font-size: 12px; color: #626f86;';
+        box.appendChild(hint);
+        self.get('/rest/api/3/project/search?maxResults=100&orderBy=name').then(function (d) {
+          var list = d.values || [];
+          sel.innerHTML = '';
+          list.forEach(function (p) {
+            var o = document.createElement('option'); o.value = p.key; o.textContent = p.name + ' (' + p.key + ')'; sel.appendChild(o);
+          });
+          if (!list.length) { var o = document.createElement('option'); o.textContent = 'Keine Projekte gefunden'; sel.appendChild(o); return; }
+          sel.disabled = false; ok.disabled = false;
+        }, function (err) { sel.innerHTML = '<option>Projektliste nicht ladbar (Status ' + self.status(err) + ')</option>'; });
+        ok.onclick = function () {
+          var key = sel.value; if (!key) return;
+          store('jp-projekt', key); resolvedKey = key; source = 'Auswahl';
+          self.showProject(key);
+          resolve(key);
+        };
+      });
+    },
+    // Zeigt "Projekt: ABC · ändern", wenn das Projekt gewählt/gespeichert wurde
+    showProject: function (key) {
+      if (BIG) return;
+      var box = projectBar();
+      box.innerHTML = '';
+      var t = document.createElement('span'); t.textContent = 'Projekt: ' + key + ' · ';
+      var a = document.createElement('a'); a.href = '#'; a.textContent = 'ändern';
+      a.onclick = function (e) { e.preventDefault(); store('jp-projekt', null); window.location.reload(); };
+      box.appendChild(t); box.appendChild(a);
+    },
+    // Was ScriptRunner übergibt (für Fehlermeldungen)
+    contextInfo: function () {
+      var info = {};
+      try { info.kontext = JSON.parse(JSON.stringify(ctx())); } catch (e) {}
+      info.urlParameter = window.location.search || '(keine)';
+      info.adresse = String(window.location.protocol) + (window.location.host ? '//' + window.location.host : '');
+      info.ap = typeof window.AP !== 'undefined';
+      info.fensterName = window.name ? 'vorhanden' : 'leer';
+      return JSON.stringify(info).slice(0, 400);
+    },
+    status: function (err) {
+      if (!err) return '?';
+      return err.status || (err.xhr && err.xhr.status) || (err.err && err.err.status) || err.message || '?';
+    },
+    // Jira-Adresse für Links: eingetragene URL, sonst aus der aufrufenden Seite abgeleitet
+    baseUrl: function (configured) {
+      if (configured) return configured.replace(/\/$/, '');
+      try {
+        var o = new URL(document.referrer).origin;
+        if (/atlassian\.net$|jira/i.test(o)) return o;
+      } catch (e) {}
+      return '';
+    }
+  };
+})();
+
+(function () {
+  // ============ EINSTELLUNGEN (Standardwerte) ============
+  // Hier muss nichts eingetragen werden. Abweichungen gibst du in der URL in ScriptRunner an,
+  // z. B. .../budget/index.html?feldname=Kosten&gruppierung=epic   (siehe Anleitung)
+  var DEFAULTS = {
+    projekt:     '',        // leer = Projekt des geöffneten Vorgangs
+    feldname:    'Budget',  // Name des Zahlenfelds, die ID wird automatisch gesucht
+    feld:        '',        // alternativ direkt die ID, z. B. customfield_10050
+    filter:      '',        // zusätzliche JQL-Bedingung, z. B. labels = 2027
+    gruppierung: '',        // 'epic' = nach übergeordnetem Vorgang zusammenfassen
+    stuecke:     8          // max. Kreisstücke, Rest wird "Sonstige"
+  };
+  // ========================================================
+  var CFG = Jira.config(DEFAULTS);
+  var FIELD = '';
+  var GROUP_BY_PARENT = CFG.gruppierung === 'epic';
+  var MAX_SLICES = Math.max(2, parseInt(CFG.stuecke, 10) || 8);
+
+  var COLORS = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#6250d6','#e34948'];
+  var rows = [];
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (n) { return n.toLocaleString('de-DE', { maximumFractionDigits: 2 }); };
+  var pct = function (v, t) { return (t ? v / t * 100 : 0).toFixed(1).replace('.', ',') + ' %'; };
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  function fail(text) { $('bw-total').textContent = '–'; $('bw-msg').textContent = text; }
+
+  var jql = '';
+
+  function start() {
+    Jira.ready(function (ok) {
+      if (!ok) { fail(Jira.error()); return; }
+      Jira.resolveProject(CFG.projekt).then(function (key) {
+        if (key) { if (Jira.projectSource() === 'gespeichert') Jira.showProject(key); return key; }
+        if (window.console) console.info('Jira-Panel: Projekt nicht erkannt, Kontext:', Jira.contextInfo());
+        return Jira.askProject();
+      }).then(function (key) {
+      Jira.resolveField(CFG.feld, CFG.feldname, key, 'number').then(function (f) {
+        if (!f) { fail('Feld "' + CFG.feldname + '" nicht gefunden. In der ScriptRunner-URL ?feldname=... oder ?feld=customfield_... angeben.'); return; }
+        FIELD = f.id;
+        jql = 'project = "' + key + '" AND cf[' + f.id.replace('customfield_', '') + '] is not EMPTY' +
+              (CFG.filter ? ' AND (' + CFG.filter + ')' : '') + ' ORDER BY created DESC';
+        load();
+      }, function (err) { fail('Feldliste konnte nicht geladen werden (Status ' + Jira.status(err) + ').'); });
+      });
+    });
+  }
+
+  function load(token) {
+    var url = '/rest/api/3/search/jql?jql=' + encodeURIComponent(jql) +
+              '&fields=summary,parent,' + FIELD + '&maxResults=100';
+    if (token) url += '&nextPageToken=' + encodeURIComponent(token);
+
+    Jira.get(url).then(
+      function (data) {
+        (data.issues || []).forEach(function (i) {
+          var amount = Number(i.fields[FIELD]) || 0;
+          var label = i.key + ' ' + i.fields.summary;
+          if (GROUP_BY_PARENT) {
+            var p = i.fields.parent;
+            label = p ? (p.key + ' ' + (p.fields ? p.fields.summary : '')) : 'Ohne übergeordneten Vorgang';
+          }
+          var ex = null;
+          for (var k = 0; k < rows.length; k++) if (rows[k].label === label) { ex = rows[k]; break; }
+          if (ex) ex.amount += amount; else rows.push({ label: label, amount: amount });
+        });
+        if (data.nextPageToken) load(data.nextPageToken); else draw();
+      },
+      function (err) {
+        fail('Daten konnten nicht geladen werden (Status ' + Jira.status(err) + '). JQL, Feld-ID und Rechte prüfen.');
+      }
+    );
+  }
+
+  function el(name, attrs) {
+    var e = document.createElementNS(SVGNS, name);
+    for (var a in attrs) e.setAttribute(a, attrs[a]);
+    return e;
+  }
+
+  function draw() {
+    var data = rows.filter(function (r) { return r.amount > 0; })
+                   .sort(function (a, b) { return b.amount - a.amount; });
+    var total = data.reduce(function (s, r) { return s + r.amount; }, 0);
+    $('bw-total').textContent = fmt(total) + ' €';
+    if (!data.length) { $('bw-msg').textContent = 'Keine Vorgänge mit Budget gefunden.'; return; }
+
+    var shown = data;
+    if (data.length > MAX_SLICES) {
+      var rest = data.slice(MAX_SLICES - 1).reduce(function (s, r) { return s + r.amount; }, 0);
+      shown = data.slice(0, MAX_SLICES - 1).concat([{ label: 'Sonstige (' + (data.length - MAX_SLICES + 1) + ')', amount: rest }]);
+    }
+
+    var svg = $('bw-pie');
+    var angle = -Math.PI / 2;
+    shown.forEach(function (r, i) {
+      var color = COLORS[i % COLORS.length];
+      var frac = r.amount / total;
+      var shape;
+      if (frac >= 0.9999) {
+        shape = el('circle', { cx: 0, cy: 0, r: 1, fill: color, 'class': 'slice' });
+      } else {
+        var a2 = angle + frac * 2 * Math.PI;
+        var x1 = Math.cos(angle), y1 = Math.sin(angle);
+        var x2 = Math.cos(a2),    y2 = Math.sin(a2);
+        var large = frac > 0.5 ? 1 : 0;
+        shape = el('path', {
+          d: 'M0 0 L' + x1 + ' ' + y1 + ' A1 1 0 ' + large + ' 1 ' + x2 + ' ' + y2 + ' Z',
+          fill: color, stroke: '#ffffff', 'stroke-width': 0.015, 'stroke-linejoin': 'round'
+        });
+        angle = a2;
+      }
+      var t = el('title', {});
+      t.textContent = r.label + ': ' + fmt(r.amount) + ' € (' + pct(r.amount, total) + ')';
+      shape.appendChild(t);
+      svg.appendChild(shape);
+    });
+
+    var tbody = document.querySelector('#bw-tbl tbody');
+    shown.forEach(function (r, i) {
+      var tr = document.createElement('tr');
+      var td1 = document.createElement('td');
+      var sw = document.createElement('span');
+      sw.className = 'sw'; sw.style.background = COLORS[i % COLORS.length];
+      td1.appendChild(sw); td1.appendChild(document.createTextNode(r.label));
+      var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = fmt(r.amount) + ' €';
+      var td3 = document.createElement('td'); td3.className = 'num'; td3.textContent = pct(r.amount, total);
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tbody.appendChild(tr);
+    });
+    $('bw-sum').textContent = fmt(total) + ' €';
+    $('bw-tbl').style.display = '';
+  }
+
+  Jira.bigButton($('bw-big'), function (t) { $('bw-msg').textContent = t; });
+  start();
+})();
+(function () {
+  // ============ EINSTELLUNGEN (Standardwerte) ============
+  // Hier muss nichts eingetragen werden. Abweichungen gibst du in der URL in ScriptRunner an,
+  // z. B. .../kalender/index.html?typ=Aufgabe&monate=18   (siehe Anleitung)
+  var DEFAULTS = {
+    projekt:   '',                          // leer = Projekt des geöffneten Vorgangs
+    typ:       'Task,Aufgabe',              // Vorgangstyp(en), der erste vorhandene Name wird genommen
+    startfeld: 'Start date,Startdatum',     // Name(n) oder ID des Startdatum-Feldes
+    filter:    '',                          // zusätzliche JQL-Bedingung, z. B. assignee = currentUser()
+    jira:      '',                          // Jira-Adresse für Links (leer = automatisch)
+    monate:    12,                          // Anzahl Monate in der Kalenderansicht
+    zeilen:    3                            // max. Striche pro Tag, Rest als "+n"
+  };
+  // ========================================================
+  var CFG = Jira.config(DEFAULTS);
+  var JIRA_URL = CFG.jira;
+  var MONTHS_SHOWN = Math.min(36, Math.max(1, parseInt(CFG.monate, 10) || 12));
+  var LINES_PER_DAY = Math.min(10, Math.max(1, parseInt(CFG.zeilen, 10) || 3));
+  var START_FIELD = '';
+
+  var COLOR = { 'new': '#626f86', indeterminate: '#2a78d6', done: '#1f845a', overdue: '#c9372c' };
+  var MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  var WD = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var raw = [], events = [], byDay = {};
+  var view = 'cal', selected = null;
+
+  // ---------- Datumshilfen (UTC, Format JJJJ-MM-TT) ----------
+  function d2s(d) { return d.toISOString().slice(0, 10); }
+  function s2d(s) { return new Date(s + 'T00:00:00Z'); }
+  function addDays(s, n) { var d = s2d(s); d.setUTCDate(d.getUTCDate() + n); return d2s(d); }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function firstOfMonth(s) { return s.slice(0, 8) + '01'; }
+  function addMonths(s, n) { var d = s2d(firstOfMonth(s)); d.setUTCMonth(d.getUTCMonth() + n); return d2s(d); }
+  function de(s) { return s ? s.split('-').reverse().join('.') : '–'; }
+  function monthLabel(s) { var d = s2d(s); return MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
+  function isoWeek(s) {
+    var d = s2d(s); var day = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - day + 3);
+    var first = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    return 1 + Math.round(((d - first) / 864e5 - 3 + ((first.getUTCDay() + 6) % 7)) / 7);
+  }
+
+  var TODAY = todayStr();
+  var winStart = firstOfMonth(TODAY);
+
+  // ---------- Daten laden ----------
+  function fail(t) { $('jk-status').textContent = ''; $('jk-msg').textContent = t; }
+
+  var jql = '';
+
+  function start() {
+    Jira.ready(function (ok) {
+      if (!ok) { fail(Jira.error()); return; }
+      Jira.resolveProject(CFG.projekt).then(function (key) {
+        if (key) { if (Jira.projectSource() === 'gespeichert') Jira.showProject(key); return key; }
+        if (window.console) console.info('Jira-Panel: Projekt nicht erkannt, Kontext:', Jira.contextInfo());
+        return Jira.askProject();
+      }).then(function (key) {
+      var typeNames = String(CFG.typ).split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+      Jira.get('/rest/api/3/project/' + encodeURIComponent(key)).then(function (proj) {
+        var types = proj.issueTypes || [];
+        var type = null;
+        for (var n = 0; n < typeNames.length && !type; n++) {
+          for (var t = 0; t < types.length; t++) {
+            if (String(types[t].name).toLowerCase() === typeNames[n]) { type = types[t]; break; }
+          }
+        }
+        if (!type) {
+          fail('Vorgangstyp "' + CFG.typ + '" im Projekt nicht gefunden. Vorhanden: ' +
+               types.map(function (x) { return x.name; }).join(', ') + '. In der ScriptRunner-URL ?typ=... angeben.');
+          return null;
+        }
+        return Jira.resolveField(/^customfield_\d+$/.test(CFG.startfeld) ? CFG.startfeld : '',
+                                 CFG.startfeld, key, 'date', proj).then(function (f) {
+          var dateCond = 'duedate is not EMPTY';
+          if (f) { START_FIELD = f.id; dateCond = '(duedate is not EMPTY OR cf[' + f.id.replace('customfield_', '') + '] is not EMPTY)'; }
+          else { $('jk-msg').textContent = 'Hinweis: Startdatum-Feld nicht gefunden, es wird nur das Fälligkeitsdatum verwendet.'; }
+          jql = 'project = "' + key + '" AND issuetype = ' + type.id + ' AND ' + dateCond +
+                (CFG.filter ? ' AND (' + CFG.filter + ')' : '') + ' ORDER BY duedate ASC';
+          load();
+        });
+      }).then(null, function (err) { fail('Projektdaten konnten nicht geladen werden (Status ' + Jira.status(err) + ').'); });
+      });
+    });
+  }
+
+  function load(token) {
+    var url = '/rest/api/3/search/jql?jql=' + encodeURIComponent(jql) +
+              '&fields=summary,status,duedate' + (START_FIELD ? ',' + START_FIELD : '') + '&maxResults=100';
+    if (token) url += '&nextPageToken=' + encodeURIComponent(token);
+    Jira.get(url).then(
+      function (data) {
+        raw = raw.concat(data.issues || []);
+        if (data.nextPageToken) load(data.nextPageToken); else prepare();
+      },
+      function (err) {
+        fail('Daten konnten nicht geladen werden (Status ' + Jira.status(err) + '). JQL, Feld-ID und Rechte prüfen.');
+      }
+    );
+  }
+
+  function prepare() {
+    raw.forEach(function (i) {
+      var f = i.fields, s = f[START_FIELD] || null, e = f.duedate || null;
+      if (!s && !e) return;
+      if (s) s = String(s).slice(0, 10);
+      if (e) e = String(e).slice(0, 10);
+      if (!s) s = e; if (!e) e = s;
+      if (s > e) { var t = s; s = e; e = t; }
+      var cat = (f.status && f.status.statusCategory && f.status.statusCategory.key) || 'new';
+      var color = COLOR[cat] || COLOR['new'];
+      if (cat !== 'done' && f.duedate && String(f.duedate).slice(0, 10) < TODAY) color = COLOR.overdue;
+      events.push({ key: i.key, summary: f.summary || '', status: f.status ? f.status.name : '–',
+                    start: s, end: e, rawStart: f[START_FIELD], rawDue: f.duedate, color: color });
+    });
+    events.sort(function (a, b) { return a.start < b.start ? -1 : a.start > b.start ? 1 : (a.end < b.end ? -1 : 1); });
+    var laneEnd = [];
+    events.forEach(function (ev) {
+      var l = 0;
+      while (l < laneEnd.length && laneEnd[l] >= ev.start) l++;
+      laneEnd[l] = ev.end; ev.lane = l;
+      var d = ev.start, guard = 0;
+      while (d <= ev.end && guard < 800) { (byDay[d] = byDay[d] || []).push(ev); d = addDays(d, 1); guard++; }
+    });
+    $('jk-status').textContent = events.length
+      ? events.length + ' Tasks mit Datum geladen. Klicke auf einen Tag für Details.'
+      : '0 Tasks mit Datum gefunden. Prüfe JQL, Vorgangstyp und Datumsfelder.';
+    render();
+  }
+
+  // ---------- Vorgang öffnen ----------
+  function openIssue(key) {
+    // 1. Jira selbst navigieren lassen (falls die Schnittstelle verfügbar ist)
+    try { if (window.AP && AP.navigator && AP.navigator.go) { AP.navigator.go('issue', { issueKey: key }); return; } } catch (e) {}
+    // 2. neuer Tab
+    var base = Jira.baseUrl(JIRA_URL), w = null;
+    if (base) { try { w = window.open(base + '/browse/' + key, '_blank'); } catch (e) {} }
+    if (w) return;
+    // 3. Hinweis mit Vorgangsnummer (z. B. für die Jira-Suche)
+    $('jk-msg').textContent = 'Vorgang ' + key + ' kann aus dem Panel nicht geöffnet werden. Bitte in Jira nach ' + key + ' suchen.';
+  }
+
+  function issueLink(ev) {
+    var a = document.createElement('a');
+    a.className = 'issue'; a.textContent = ev.key; a.href = '#';
+    a.onclick = function (e) { e.preventDefault(); openIssue(ev.key); };
+    return a;
+  }
+  function td(text, cls) { var c = document.createElement('td'); if (cls) c.className = cls; if (text != null) c.textContent = text; return c; }
+
+  // ---------- Ansicht: 12 Monate ----------
+  function renderCal() {
+    var box = document.createElement('div'); box.className = 'months';
+    for (var m = 0; m < MONTHS_SHOWN; m++) box.appendChild(renderMonth(addMonths(winStart, m)));
+    return box;
+  }
+
+  function lanesLimit() { return /\bgross\b/.test(document.documentElement.className) ? Math.max(LINES_PER_DAY, 6) : LINES_PER_DAY; }
+
+  function selectDay(ds) {
+    selected = ds; render();
+    var d = $('jk-detail'); if (d.scrollIntoView) d.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function renderMonth(first) {
+    var wrap = document.createElement('div'); wrap.className = 'month';
+    var h = document.createElement('div'); h.className = 'mname'; h.textContent = monthLabel(first); wrap.appendChild(h);
+    var head = document.createElement('div'); head.className = 'whead';
+    var kwh = document.createElement('div'); kwh.className = 'wd'; kwh.textContent = 'KW'; head.appendChild(kwh);
+    WD.forEach(function (w) { var c = document.createElement('div'); c.className = 'wd'; c.textContent = w; head.appendChild(c); });
+    wrap.appendChild(head);
+
+    var offset = (s2d(first).getUTCDay() + 6) % 7;
+    var nextMonth = addMonths(first, 1);
+    var lastDay = addDays(nextMonth, -1);
+    var cur = addDays(first, -offset);
+    while (cur < nextMonth) {
+      wrap.appendChild(renderWeek(cur, first < cur ? cur : first, addDays(cur, 6) < lastDay ? addDays(cur, 6) : lastDay));
+      cur = addDays(cur, 7);
+    }
+    return wrap;
+  }
+
+  // Eine Woche: Tageszellen als Hintergrund, Tasks als Balken mit Titel darüber
+  function renderWeek(weekStart, visFrom, visTo) {
+    var limit = lanesLimit();
+    var row = document.createElement('div'); row.className = 'week';
+    var kw = document.createElement('div'); kw.className = 'kw'; kw.textContent = isoWeek(weekStart);
+    kw.style.gridColumn = '1'; kw.style.gridRow = '1 / -1'; row.appendChild(kw);
+
+    // Abschnitte der Tasks innerhalb des sichtbaren Teils dieser Woche
+    var segs = [];
+    events.forEach(function (ev) {
+      if (ev.end < visFrom || ev.start > visTo) return;
+      segs.push({ ev: ev, from: ev.start < visFrom ? visFrom : ev.start, to: ev.end > visTo ? visTo : ev.end });
+    });
+    segs.sort(function (x, y) { return x.from < y.from ? -1 : x.from > y.from ? 1 : (x.to > y.to ? -1 : 1); });
+    var laneEnd = [], hiddenPerDay = {};
+    segs.forEach(function (sg) {
+      var l = 0; while (l < laneEnd.length && laneEnd[l] >= sg.from) l++;
+      laneEnd[l] = sg.to; sg.lane = l;
+      if (l >= limit) { var d = sg.from; while (d <= sg.to) { hiddenPerDay[d] = (hiddenPerDay[d] || 0) + 1; d = addDays(d, 1); } }
+    });
+    var lanes = Math.min(limit, laneEnd.length);
+    row.style.gridTemplateRows = '18px' + (lanes ? ' repeat(' + lanes + ', 18px)' : '') + ' 6px';
+
+    for (var i = 0; i < 7; i++) {
+      var ds = addDays(weekStart, i);
+      var inMonth = ds >= visFrom && ds <= visTo;
+      var c = document.createElement('div');
+      c.style.gridColumn = String(i + 2); c.style.gridRow = '1 / -1';
+      if (!inMonth) { c.className = 'day empty'; row.appendChild(c); continue; }
+      c.className = 'day' + (i >= 5 ? ' we' : '') + (ds === TODAY ? ' today' : '') + (ds === selected ? ' sel' : '');
+      var n = document.createElement('div'); n.className = 'n'; n.textContent = Number(ds.slice(8)); c.appendChild(n);
+      if (hiddenPerDay[ds]) { var mo = document.createElement('div'); mo.className = 'more'; mo.textContent = '+' + hiddenPerDay[ds]; c.appendChild(mo); }
+      var list = byDay[ds] || [];
+      if (list.length) c.title = de(ds) + ': ' + list.length + ' Task(s)\n' +
+        list.slice(0, 8).map(function (e) { return e.key + ' ' + e.summary; }).join('\n') + (list.length > 8 ? '\n…' : '');
+      (function (d) { c.onclick = function () { selectDay(d); }; })(ds);
+      row.appendChild(c);
+    }
+
+    segs.forEach(function (sg) {
+      if (sg.lane >= limit) return;
+      var colFrom = 2 + Math.round((s2d(sg.from) - s2d(weekStart)) / 864e5);
+      var colTo = 2 + Math.round((s2d(sg.to) - s2d(weekStart)) / 864e5);
+      var bar = document.createElement('div');
+      bar.className = 'ev' + (sg.from > sg.ev.start ? ' cont-l' : '') + (sg.to < sg.ev.end ? ' cont-r' : '');
+      bar.style.gridColumn = colFrom + ' / ' + (colTo + 1);
+      bar.style.gridRow = String(sg.lane + 2);
+      bar.style.background = sg.ev.color;
+      bar.textContent = sg.ev.summary || sg.ev.key;
+      bar.title = sg.ev.key + ' – ' + sg.ev.summary + '\nStatus: ' + sg.ev.status +
+        '\nStart: ' + de(sg.ev.rawStart ? String(sg.ev.rawStart).slice(0, 10) : null) +
+        '\nFällig: ' + de(sg.ev.rawDue ? String(sg.ev.rawDue).slice(0, 10) : null);
+      (function (d) { bar.onclick = function (e) { e.stopPropagation(); selectDay(d); }; })(sg.from);
+      row.appendChild(bar);
+    });
+    return row;
+  }
+
+  // ---------- Detail zum gewählten Tag ----------
+  function renderDetail() {
+    var box = $('jk-detail'); box.innerHTML = '';
+    if (view !== 'cal' || !selected) return;
+    var list = byDay[selected] || [];
+    var d = document.createElement('div'); d.className = 'detail';
+    var h = document.createElement('h3'); h.textContent = 'Tasks am ' + de(selected) + ' (' + list.length + ')'; d.appendChild(h);
+    if (!list.length) { var p = document.createElement('div'); p.textContent = 'Keine Tasks an diesem Tag.'; d.appendChild(p); }
+    else d.appendChild(taskTable(list, null));
+    box.appendChild(d);
+  }
+
+  function taskTable(list, groupByMonth) {
+    var t = document.createElement('table');
+    var hr = document.createElement('tr');
+    ['Vorgang', 'Titel', 'Status', 'Start', 'Fällig'].forEach(function (x) { var th = document.createElement('th'); th.textContent = x; hr.appendChild(th); });
+    var thead = document.createElement('thead'); thead.appendChild(hr); t.appendChild(thead);
+    var tb = document.createElement('tbody'); var lastM = null;
+    list.forEach(function (ev) {
+      if (groupByMonth) {
+        var m = groupByMonth(ev);
+        if (m !== lastM) {
+          var gr = document.createElement('tr'); gr.className = 'mhead';
+          var gc = td(monthLabel(m)); gc.colSpan = 5; gr.appendChild(gc); tb.appendChild(gr); lastM = m;
+        }
+      }
+      var tr = document.createElement('tr');
+      var c1 = td(null, 'nw'); var sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = ev.color;
+      c1.appendChild(sw); c1.appendChild(issueLink(ev)); tr.appendChild(c1);
+      tr.appendChild(td(ev.summary));
+      tr.appendChild(td(ev.status, 'nw'));
+      tr.appendChild(td(de(ev.rawStart ? String(ev.rawStart).slice(0, 10) : null), 'nw'));
+      tr.appendChild(td(de(ev.rawDue ? String(ev.rawDue).slice(0, 10) : null), 'nw'));
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    var w = document.createElement('div'); w.className = 'tw'; w.appendChild(t);
+    return w;
+  }
+
+  // ---------- Ansicht: Liste ----------
+  function renderList() {
+    var winEnd = addDays(addMonths(winStart, MONTHS_SHOWN), -1);
+    var list = events.filter(function (e) { return e.end >= winStart && e.start <= winEnd; });
+    if (!list.length) { var p = document.createElement('div'); p.textContent = 'Keine Tasks in diesem Zeitraum.'; return p; }
+    return taskTable(list, function (ev) { return firstOfMonth(ev.start < winStart ? winStart : ev.start); });
+  }
+
+  // ---------- Rendern ----------
+  function render() {
+    var last = addMonths(winStart, MONTHS_SHOWN - 1);
+    $('jk-title').textContent = monthLabel(winStart) + ' – ' + monthLabel(last);
+    $('jk-vcal').textContent = MONTHS_SHOWN + (MONTHS_SHOWN === 1 ? ' Monat' : ' Monate');
+    $('jk-vcal').className = view === 'cal' ? 'on' : '';
+    $('jk-vlist').className = view === 'list' ? 'on' : '';
+    var v = $('jk-view'); v.innerHTML = '';
+    v.appendChild(view === 'cal' ? renderCal() : renderList());
+    renderDetail();
+  }
+
+  $('jk-prev').onclick  = function () { winStart = addMonths(winStart, -1); render(); };
+  $('jk-next').onclick  = function () { winStart = addMonths(winStart, 1); render(); };
+  $('jk-today').onclick = function () { winStart = firstOfMonth(TODAY); selected = TODAY; render(); };
+  $('jk-vcal').onclick  = function () { view = 'cal'; render(); };
+  $('jk-vlist').onclick = function () { view = 'list'; render(); };
+
+  render();
+  Jira.bigButton($('jk-big'), function (t) { $('jk-msg').textContent = t; });
+  var rT = null;
+  window.addEventListener('resize', function () { clearTimeout(rT); rT = setTimeout(function () { if (events.length) render(); }, 150); });
+  start();
+})();
+(function () {
+  // Kombinierte Ansicht: Im Panel nur die Überschriften. Klick öffnet den Bereich in der Großansicht
+  // (neuer Tab, sonst Vollbild). In der Großansicht wird nur der gewählte Bereich gezeigt.
+  var root = document.documentElement;
+  var m = /[?&]ansicht=(budget|kalender)/.exec(window.location.search);
+  if (Jira.isBig && m) root.className += ' nur-' + m[1];
+
+  function setNur(name) {
+    root.className = root.className.replace(/\s*\bnur-\w+/g, '') + (name ? ' nur-' + name : '');
+  }
+  // Vollbild beendet: zurück zur Überschriften-Ansicht
+  function onFs() { if (!Jira.isFullscreen()) setNur(''); }
+  document.addEventListener('fullscreenchange', onFs);
+  document.addEventListener('webkitfullscreenchange', onFs);
+
+  var secs = [
+    { id: 'sec-budget', name: 'budget', ready: function () { return !/Lade/.test(txt('bw-total')); },
+      info: function () { var t = txt('bw-total'); return t && t !== '–' ? t : ''; }, msg: function () { return txt('bw-msg'); } },
+    { id: 'sec-kalender', name: 'kalender', ready: function () { return !/Lade/.test(txt('jk-status')) || !!txt('jk-msg'); },
+      info: function () { var n = /^(\d+) Tasks/.exec(txt('jk-status')); return n ? n[1] + ' Tasks' : ''; }, msg: function () { return txt('jk-msg'); } }
+  ];
+  function txt(id) { var e = document.getElementById(id); return e ? e.textContent.trim() : ''; }
+
+  secs.forEach(function (s) {
+    var sec = document.getElementById(s.id); if (!sec) return;
+    var title = sec.querySelector('.jp-title');
+    var info = document.createElement('span'); info.className = 'jp-info'; info.textContent = 'lädt …';
+    var open = document.createElement('span'); open.className = 'jp-open'; open.innerHTML = '&#x2922;';
+    title.appendChild(info); title.appendChild(open);
+    var note = document.createElement('div'); note.className = 'jp-note';
+    title.parentNode.insertBefore(note, title.nextSibling);
+    s.title = title; s.infoEl = info; s.note = note;
+
+    title.setAttribute('role', 'button');
+    title.setAttribute('tabindex', '0');
+    title.title = 'In der Großansicht öffnen';
+    function go() {
+      if (Jira.isBig || Jira.isFullscreen()) return;
+      Jira.openBig('ansicht=' + s.name, function (t) { if (t) note.textContent = t; }, function () { setNur(s.name); });
+    }
+    title.onclick = go;
+    title.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
+
+  // Kurzinfo und Meldungen der Bereiche neben die Überschriften übernehmen
+  var ticks = 0;
+  (function update() {
+    var allReady = true;
+    secs.forEach(function (s) {
+      if (!s.title) return;
+      var ready = s.ready();
+      allReady = allReady && ready;
+      s.infoEl.textContent = ready ? s.info() : 'lädt …';
+      var msg = s.msg();
+      if (msg && s.note.textContent !== msg) s.note.textContent = msg;
+    });
+    if (!allReady || ++ticks < 20) setTimeout(update, allReady ? 1000 : 300);
+  })();
+})();
+</script>
+</body>
+</html>
