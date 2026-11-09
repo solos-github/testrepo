@@ -147,14 +147,53 @@ var Jira = (function () {
       });
     },
     // Button "Großansicht" einrichten (im Panel sichtbar, in der Großansicht ausgeblendet)
+    // 1. Versuch: neuer Tab. 2. Versuch (falls der Rahmen keine neuen Fenster erlaubt): Vollbild.
     bigButton: function (btn, onError) {
       if (!btn) return;
       if (BIG) { btn.style.display = 'none'; return; }
+      var label = btn.innerHTML;
+      var root = document.documentElement;
+      function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+      function onFsChange() {
+        var on = !!fsElement();
+        if (on) { if (root.className.indexOf('gross') < 0) root.className += ' gross'; }
+        else root.className = root.className.replace(/\s*gross/g, '');
+        btn.innerHTML = on ? '&#x2715; Vollbild beenden' : label;
+        btn.title = on ? 'Vollbild beenden (oder Esc)' : 'Große Ansicht öffnen';
+        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+      }
+      document.addEventListener('fullscreenchange', onFsChange);
+      document.addEventListener('webkitfullscreenchange', onFsChange);
+
+      function tryFullscreen() {
+        var req = root.requestFullscreen || root.webkitRequestFullscreen;
+        var enabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+        if (!req || !enabled) return false;
+        try {
+          var p = req.call(root);
+          if (p && p.catch) p.catch(function () {
+            if (onError) onError('Großansicht nicht möglich: ScriptRunner erlaubt im Panel weder neue Tabs noch Vollbild.');
+          });
+          return true;
+        } catch (e) { return false; }
+      }
+
       btn.onclick = function () {
+        if (onError) onError('');
+        if (fsElement()) {
+          (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+          return;
+        }
         var sep = window.location.search ? '&' : '?';
         var url = window.location.href.split('#')[0].replace(/([?&])gross=1(&|$)/, '$1') + sep + 'gross=1';
-        var w = window.open(url, '_blank');
-        if (!w) { if (onError) onError('Neuer Tab wurde blockiert. Pop-ups für diese Seite erlauben.'); return; }
+        var w = null;
+        try { w = window.open(url, '_blank'); } catch (e) { w = null; }
+        if (!w) {
+          if (!tryFullscreen() && onError) {
+            onError('Großansicht nicht möglich: ScriptRunner erlaubt im Panel weder neue Tabs noch Vollbild. Tipp: Vorgang in der Vollansicht öffnen und die Seitenleiste breiter ziehen.');
+          }
+          return;
+        }
         var handler = function (e) {
           if (e.source !== w || !e.data || e.data.type !== 'jp-ready') return;
           w.postMessage({ type: 'jp-data', cache: cache, ctx: ctx() }, target());
