@@ -9,33 +9,50 @@
      Einstellungen: nichts eintragen, Abweichungen per URL-Parameter (siehe EINSTELLUNGEN.md). -->
 <style>
 html, body { margin: 0; padding: 0; background: #ffffff; }
-  .bw { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 16px; max-width: 760px; }
-  .bw h2 { margin: 0 0 4px; font-size: 14px; font-weight: 500; color: #626f86; }
-  .bw .total { margin: 0 0 16px; font-size: 28px; font-weight: 600; }
-  .bw .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
-  .bw svg { width: 280px; height: 280px; flex-shrink: 0; }
-  .bw svg path, .bw svg circle { cursor: default; transition: opacity .15s; }
-  .bw svg:hover path, .bw svg:hover circle.slice { opacity: .55; }
-  .bw svg path:hover, .bw svg circle.slice:hover { opacity: 1; }
-  .bw table { border-collapse: collapse; flex: 1; min-width: 280px; font-size: 14px; }
-  .bw td, .bw th { padding: 6px 8px; border-bottom: 1px solid #dfe1e6; text-align: left; }
-  .bw th { color: #626f86; font-weight: 500; }
-  .bw .num { text-align: right; white-space: nowrap; }
-  .bw .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 0; }
-  .bw tfoot td { font-weight: 600; border-bottom: none; }
-  .bw .msg { color: #c9372c; margin-top: 8px; }
-  .bw .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 4px; }
-  .bw .head h2 { margin: 0; }
+  .bw { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px 16px 16px; max-width: 760px; font-size: 14px; }
+  .bw .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 12px; }
+  .bw .yr { display: flex; align-items: center; gap: 6px; }
+  .bw .yr button { font: inherit; width: 28px; height: 28px; border: 1px solid #c1c7d0; background: #fff; color: #172b4d; border-radius: 4px; cursor: pointer; }
+  .bw .yr button:hover { background: #f1f2f4; }
+  .bw .yr span { font-weight: 600; min-width: 44px; text-align: center; }
+  .bw .row { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+  .bw .donut { position: relative; width: 190px; height: 190px; flex-shrink: 0; }
+  .bw .donut svg { width: 100%; height: 100%; display: block; }
+  .bw .donut .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .bw .donut .lbl { font-size: 12px; color: #44546f; }
+  .bw .donut .total { font-size: 19px; font-weight: 700; margin-top: 2px; white-space: nowrap; }
+  .bw .donut path, .bw .donut circle { transition: opacity .15s; }
+  .bw .donut svg:hover .seg { opacity: .55; }
+  .bw .donut svg .seg:hover { opacity: 1; }
+  .bw table { border-collapse: collapse; }
+  .bw .legend { flex: 0 1 380px; min-width: 210px; }
+  .bw .legend td { padding: 6px 4px; border: 0; white-space: nowrap; }
+  .bw .legend .num { text-align: right; }
+  .bw .legend .pc { color: #626f86; text-align: right; padding-left: 6px; }
+  .bw .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 8px; vertical-align: -2px; }
+  .bw h3 { font-size: 14px; font-weight: 600; margin: 20px 0 8px; }
+  .bw .cmp { width: 100%; border: 1px solid #dfe1e6; }
+  .bw .cmp th, .bw .cmp td { padding: 7px 10px; border: 1px solid #dfe1e6; text-align: right; white-space: nowrap; }
+  .bw .cmp th { background: #f7f8f9; font-weight: 600; color: #44546f; }
+  .bw .cmp td:first-child, .bw .cmp th:first-child { text-align: left; }
+  .bw .cmp td:first-child { font-weight: 600; }
+  .bw .cmp tr.sum td { background: #f7f8f9; }
+  .bw .cmp .over { color: #c9372c; }
+  .bw .tw { overflow-x: auto; }
+  .bw .msg { color: #c9372c; margin: 8px 0 0; }
+  .bw .note { color: #626f86; font-size: 12px; margin: 8px 0 0; }
+  .bw .note:empty, .bw .msg:empty { display: none; }
   .big-btn { font: inherit; font-size: 12px; padding: 4px 10px; border: 1px solid #c1c7d0; background: #fff; color: #172b4d; border-radius: 4px; cursor: pointer; white-space: nowrap; }
   .big-btn:hover { background: #f1f2f4; }
-  html.gross .bw { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
-  html.gross .bw .total { font-size: 36px; }
-  html.gross .bw svg { width: 440px; height: 440px; }
-  html.gross .bw table { font-size: 15px; }
+  html.gross .bw { max-width: 1000px; margin: 20px auto; padding: 0 24px; font-size: 15px; }
+  html.gross .bw .donut { width: 300px; height: 300px; }
+  html.gross .bw .donut .lbl { font-size: 15px; }
+  html.gross .bw .donut .total { font-size: 28px; }
+  html.gross .bw .row { gap: 48px; }
   .jp-title { font: 600 16px -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px 16px 0;
               padding-bottom: 8px; border-bottom: 1px solid #dfe1e6; display: flex; align-items: center; gap: 8px; }
   .jp-title .ico { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
-  html.gross .jp-title { max-width: 1100px; margin: 20px auto 0; padding-left: 24px; padding-right: 24px; font-size: 20px; }
+  html.gross .jp-title { max-width: 1000px; margin: 20px auto 0; padding-left: 24px; padding-right: 24px; font-size: 20px; }
   .jk { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; margin: 12px; font-size: 13px; }
   .jk button { font: inherit; padding: 5px 12px; border: 1px solid #c1c7d0; background: #fff; color: #172b4d; border-radius: 4px; cursor: pointer; }
   .jk button:hover { background: #f1f2f4; }
@@ -120,19 +137,28 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
 <body>
 <div id="jp-projbar"></div>
 <section class="jp-sec" id="sec-budget">
-<div class="jp-title"><span class="ico" style="background:#2a78d6"></span>Budget-Übersicht</div>
+<div class="jp-title"><span class="ico" style="background:#2a78d6"></span><span class="jp-tt" id="bw-title">Wirtschaftsplan – Übersicht</span></div>
 <div class="bw">
-  <div class="head"><h2>Budget gesamt</h2><button class="big-btn" id="bw-big" title="In einem neuen Tab über die ganze Breite anzeigen">&#x2922; Großansicht</button></div>
-  <p class="total" id="bw-total">Lade …</p>
+  <div class="head">
+    <div class="yr"><button id="bw-prev" title="Vorjahr">&#8249;</button><span id="bw-year"></span><button id="bw-next" title="Folgejahr">&#8250;</button></div>
+    <button class="big-btn" id="bw-big" title="In einem neuen Tab über die ganze Breite anzeigen">&#x2922; Großansicht</button>
+  </div>
   <div class="row">
-    <svg id="bw-pie" viewBox="-1.05 -1.05 2.1 2.1" role="img" aria-label="Kreisdiagramm der Budgets in Euro"></svg>
-    <table id="bw-tbl" style="display:none">
-      <thead><tr><th>Position</th><th class="num">Budget</th><th class="num">Anteil</th></tr></thead>
+    <div class="donut">
+      <svg id="bw-pie" viewBox="-1.05 -1.05 2.1 2.1" role="img" aria-label="Ringdiagramm Gesamtbudget nach Status"></svg>
+      <div class="center"><div class="lbl">Gesamtbudget</div><div class="total" id="bw-total">Lade …</div></div>
+    </div>
+    <table class="legend" id="bw-legend"><tbody></tbody></table>
+  </div>
+  <h3>Budgetvergleich</h3>
+  <div class="tw">
+    <table class="cmp" id="bw-cmp">
+      <thead><tr><th></th><th>Plan</th><th>Ist</th><th>Abweichung</th></tr></thead>
       <tbody></tbody>
-      <tfoot><tr><td>Summe</td><td class="num" id="bw-sum"></td><td class="num">100 %</td></tr></tfoot>
     </table>
   </div>
   <p class="msg" id="bw-msg"></p>
+  <p class="note" id="bw-note"></p>
 </div>
 </section>
 <section class="jp-sec" id="sec-kalender">
@@ -530,28 +556,30 @@ var Jira = (function () {
 
 (function () {
   // ============ EINSTELLUNGEN (Standardwerte) ============
-  // Hier muss nichts eingetragen werden. Abweichungen gibst du in der URL in ScriptRunner an,
-  // z. B. .../budget/index.html?feldname=Kosten&gruppierung=epic   (siehe Anleitung)
+  // Abweichungen können auch per URL-Parameter angegeben werden (falls ScriptRunner sie weitergibt).
   var DEFAULTS = {
-    projekt:     '',        // leer = Projekt des geöffneten Vorgangs
-    feldname:    'Gesamtbudget,Budget',  // Name(n) des Budgetfelds, der erste vorhandene wird genommen
-    feld:        'customfield_12413',  // ID des Feldes "Gesamtbudget" (leer = Suche über feldname)
-    filter:      '',        // zusätzliche JQL-Bedingung, z. B. labels = 2027
-    gruppierung: '',        // 'epic' = nach übergeordnetem Vorgang zusammenfassen
-    stuecke:     8          // max. Kreisstücke, Rest wird "Sonstige"
+    projekt:  '',                                  // leer = Projekt des geöffneten Vorgangs
+    plan:     'customfield_12413',                 // Plan-Wert: Feld "Gesamtbudget"
+    ist:      'customfield_12690',                 // Ist-Wert: Feld "Ist-Budget"
+    statusfeld: 'customfield_12414',               // Auswahlfeld "Status Budget"
+    status:   'Geplant,In Arbeit,Wartet,Erledigt,Sonstige', // Optionen im Diagramm (Reihenfolge)
+    farben:   '#2a78d6,#1baf7a,#eb6834,#216e4e,#8590a2',   // Farben passend zu den Optionen
+    jahr:     '',                                  // leer = laufendes Jahr (Zuordnung über Fälligkeitsdatum)
+    titel:    'Wirtschaftsplan {jahr} – Übersicht',
+    filter:   ''                                   // zusätzliche JQL-Bedingung
   };
   // ========================================================
   var CFG = Jira.config(DEFAULTS);
-  var FIELD = '';
-  var GROUP_BY_PARENT = CFG.gruppierung === 'epic';
-  var MAX_SLICES = Math.max(2, parseInt(CFG.stuecke, 10) || 8);
+  var STATUSES = String(CFG.status).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  var COLORS = String(CFG.farben).split(',').map(function (s) { return s.trim(); });
+  var NONE = { name: 'Ohne Budgetstatus', color: '#c1c7d0' };
 
-  var COLORS = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#6250d6','#e34948'];
-  var rows = [];
-  var diag = { projekt: '', feld: '', anzahl: 0, beispiele: [] };   // für Fehlermeldungen
+  var issues = [];            // { key, summary, status, year, plan, ist }
+  var year = parseInt(CFG.jahr, 10) || new Date().getFullYear();
+  var diag = { projekt: '', anzahl: 0, beispiele: [] };
+  var jql = '';
   var $ = function (id) { return document.getElementById(id); };
-  var fmt = function (n) { return n.toLocaleString('de-DE', { maximumFractionDigits: 2 }); };
-  var pct = function (v, t) { return (t ? v / t * 100 : 0).toFixed(1).replace('.', ',') + ' %'; };
+  var fmt = function (n) { return Math.round(n).toLocaleString('de-DE') + ' €'; };
   var SVGNS = 'http://www.w3.org/2000/svg';
 
   // Betrag lesen: Zahl, oder Text wie "12.500,00 €", "12.500", "12,50", "1,234.50"
@@ -562,20 +590,18 @@ var Jira = (function () {
     var t = String(v).replace(/[^\d,.\-]/g, '');
     var hasC = t.indexOf(',') >= 0, hasD = t.indexOf('.') >= 0;
     if (hasC && hasD) {
-      // das letzte Zeichen ist das Dezimaltrennzeichen
       t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
     } else if (hasC) {
       t = /^-?\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.');
     } else if (hasD) {
-      if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');   // deutsche Tausenderpunkte
+      if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
     }
     var n = parseFloat(t);
     return isNaN(n) ? 0 : n;
   }
 
   function fail(text) { $('bw-total').textContent = '–'; $('bw-msg').textContent = text; }
-
-  var jql = '';
+  function cfNum(id) { return id.replace('customfield_', ''); }
 
   function start() {
     Jira.ready(function (ok) {
@@ -585,52 +611,49 @@ var Jira = (function () {
         if (window.console) console.info('Jira-Panel: Projekt nicht erkannt, Kontext:', Jira.contextInfo());
         return Jira.askProject();
       }).then(function (key) {
-      // Namen der Reihe nach: je Name erst ein Zahlenfeld, dann ein Feld beliebigen Typs (z. B. Text)
-      var names = String(CFG.feldname).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
-      var chain = CFG.feld ? Jira.resolveField(CFG.feld, '', key, null) : Promise.resolve(null);
-      names.forEach(function (n) {
-        chain = chain.then(function (f) { return f || Jira.resolveField('', n, key, 'number'); })
-                     .then(function (f) { return f || Jira.resolveField('', n, key, null); });
-      });
-      chain.then(function (f) {
-        if (!f) { fail('Feld "' + CFG.feldname.split(',').join('" bzw. "') + '" nicht gefunden. In der ScriptRunner-URL ?feldname=... oder ?feld=customfield_... angeben.'); return; }
-        FIELD = f.id;
         diag.projekt = key;
-        diag.feld = (f.name || '?') + ' (' + f.id + (f.schema && f.schema.type ? ', ' + f.schema.type : '') + (f.scope && f.scope.project ? ', nur Projekt-ID ' + f.scope.project.id : '') + ')';
-        jql = 'project = "' + key + '" AND cf[' + f.id.replace('customfield_', '') + '] is not EMPTY' +
-              (CFG.filter ? ' AND (' + CFG.filter + ')' : '') + ' ORDER BY created DESC';
+        // alle Jahre laden, damit der Jahresumschalter ohne neue Abfrage funktioniert (auch in der Großansicht)
+        jql = 'project = "' + key + '" AND (cf[' + cfNum(CFG.plan) + '] is not EMPTY OR cf[' + cfNum(CFG.ist) + '] is not EMPTY)' +
+              (CFG.filter ? ' AND (' + CFG.filter + ')' : '') + ' ORDER BY duedate ASC';
         load();
-      }, function (err) { fail('Feldliste konnte nicht geladen werden (Status ' + Jira.status(err) + ').'); });
       });
     });
   }
 
   function load(token) {
     var url = '/rest/api/3/search/jql?jql=' + encodeURIComponent(jql) +
-              '&fields=summary,parent,' + FIELD + '&maxResults=100';
+              '&fields=summary,duedate,' + CFG.statusfeld + ',' + CFG.plan + ',' + CFG.ist + '&maxResults=100';
     if (token) url += '&nextPageToken=' + encodeURIComponent(token);
-
-    Jira.get(url).then(
-      function (data) {
-        (data.issues || []).forEach(function (i) {
-          diag.anzahl++;
-          if (diag.beispiele.length < 2) { var rv = i.fields[FIELD]; diag.beispiele.push(i.key + '=' + (rv === undefined ? 'nicht geliefert' : JSON.stringify(rv)).slice(0, 80)); }
-          var amount = toAmount(i.fields[FIELD]);
-          var label = i.key + ' ' + i.fields.summary;
-          if (GROUP_BY_PARENT) {
-            var p = i.fields.parent;
-            label = p ? (p.key + ' ' + (p.fields ? p.fields.summary : '')) : 'Ohne übergeordneten Vorgang';
-          }
-          var ex = null;
-          for (var k = 0; k < rows.length; k++) if (rows[k].label === label) { ex = rows[k]; break; }
-          if (ex) ex.amount += amount; else rows.push({ label: label, amount: amount });
+    Jira.get(url).then(function (data) {
+      (data.issues || []).forEach(function (i) {
+        var f = i.fields || {};
+        diag.anzahl++;
+        if (diag.beispiele.length < 2) diag.beispiele.push(i.key + ': Plan=' + JSON.stringify(f[CFG.plan]) + ', Ist=' + JSON.stringify(f[CFG.ist]));
+        issues.push({
+          key: i.key, summary: f.summary || '',
+          status: optionValue(f[CFG.statusfeld]),
+          year: f.duedate ? parseInt(String(f.duedate).slice(0, 4), 10) : null,
+          plan: toAmount(f[CFG.plan]), ist: toAmount(f[CFG.ist])
         });
-        if (data.nextPageToken) load(data.nextPageToken); else draw();
-      },
-      function (err) {
-        fail('Daten konnten nicht geladen werden (Status ' + Jira.status(err) + '). JQL, Feld-ID und Rechte prüfen.');
-      }
-    );
+      });
+      if (data.nextPageToken) load(data.nextPageToken); else render();
+    }, function (err) {
+      fail('Daten konnten nicht geladen werden (Status ' + Jira.status(err) + '). Feld-IDs und Rechte prüfen.');
+    });
+  }
+
+  // Wert eines Auswahlfelds lesen ({ value: 'Geplant' }, Text oder Liste)
+  function optionValue(v) {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) v = v[0];
+    if (v && typeof v === 'object') return String(v.value || v.name || '');
+    return String(v);
+  }
+
+  function groupOf(statusName) {
+    var s = String(statusName).toLowerCase();
+    for (var i = 0; i < STATUSES.length; i++) if (STATUSES[i].toLowerCase() === s) return i;
+    return -1;
   }
 
   function el(name, attrs) {
@@ -639,64 +662,110 @@ var Jira = (function () {
     return e;
   }
 
-  function draw() {
-    var data = rows.filter(function (r) { return r.amount > 0; })
-                   .sort(function (a, b) { return b.amount - a.amount; });
-    var total = data.reduce(function (s, r) { return s + r.amount; }, 0);
-    $('bw-total').textContent = fmt(total) + ' €';
-    if (!data.length) {
-      $('bw-msg').textContent = 'Keine Vorgänge mit Budget gefunden. Diagnose: Projekt ' + diag.projekt + ', Feld ' + diag.feld +
-        ', ' + diag.anzahl + ' Vorgänge mit befülltem Feld' + (diag.beispiele.length ? ', Beispielwerte: ' + diag.beispiele.join('; ') : '') + '.';
-      if (window.console) console.info('Budget-Panel Diagnose', diag, 'JQL:', jql);
-      return;
-    }
-
-    var shown = data;
-    if (data.length > MAX_SLICES) {
-      var rest = data.slice(MAX_SLICES - 1).reduce(function (s, r) { return s + r.amount; }, 0);
-      shown = data.slice(0, MAX_SLICES - 1).concat([{ label: 'Sonstige (' + (data.length - MAX_SLICES + 1) + ')', amount: rest }]);
-    }
-
-    var svg = $('bw-pie');
-    var angle = -Math.PI / 2;
-    shown.forEach(function (r, i) {
-      var color = COLORS[i % COLORS.length];
-      var frac = r.amount / total;
-      var shape;
-      if (frac >= 0.9999) {
-        shape = el('circle', { cx: 0, cy: 0, r: 1, fill: color, 'class': 'slice' });
-      } else {
-        var a2 = angle + frac * 2 * Math.PI;
-        var x1 = Math.cos(angle), y1 = Math.sin(angle);
-        var x2 = Math.cos(a2),    y2 = Math.sin(a2);
-        var large = frac > 0.5 ? 1 : 0;
-        shape = el('path', {
-          d: 'M0 0 L' + x1 + ' ' + y1 + ' A1 1 0 ' + large + ' 1 ' + x2 + ' ' + y2 + ' Z',
-          fill: color, stroke: '#ffffff', 'stroke-width': 0.015, 'stroke-linejoin': 'round'
-        });
-        angle = a2;
-      }
-      var t = el('title', {});
-      t.textContent = r.label + ': ' + fmt(r.amount) + ' € (' + pct(r.amount, total) + ')';
-      shape.appendChild(t);
-      svg.appendChild(shape);
-    });
-
-    var tbody = document.querySelector('#bw-tbl tbody');
-    shown.forEach(function (r, i) {
-      var tr = document.createElement('tr');
-      var td1 = document.createElement('td');
-      var sw = document.createElement('span');
-      sw.className = 'sw'; sw.style.background = COLORS[i % COLORS.length];
-      td1.appendChild(sw); td1.appendChild(document.createTextNode(r.label));
-      var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = fmt(r.amount) + ' €';
-      var td3 = document.createElement('td'); td3.className = 'num'; td3.textContent = pct(r.amount, total);
-      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
-      tbody.appendChild(tr);
-    });
-    $('bw-sum').textContent = fmt(total) + ' €';
-    $('bw-tbl').style.display = '';
+  // Ringsegment von Winkel a1 bis a2 (Bogenmaß), außen r1, innen r0
+  function arcPath(a1, a2, r0, r1) {
+    var large = (a2 - a1) > Math.PI ? 1 : 0;
+    function p(r, a) { return (r * Math.cos(a)).toFixed(5) + ' ' + (r * Math.sin(a)).toFixed(5); }
+    return 'M' + p(r1, a1) + ' A' + r1 + ' ' + r1 + ' 0 ' + large + ' 1 ' + p(r1, a2) +
+           ' L' + p(r0, a2) + ' A' + r0 + ' ' + r0 + ' 0 ' + large + ' 0 ' + p(r0, a1) + ' Z';
   }
+
+  function render() {
+    var title = String(CFG.titel).replace('{jahr}', year);
+    $('bw-title').textContent = title;
+    $('bw-year').textContent = year;
+    $('bw-msg').textContent = '';
+
+    // Gruppen: konfigurierte Status + Sonstige
+    var groups = STATUSES.map(function (n, i) { return { name: n, color: COLORS[i] || OTHER.color, plan: 0, ist: 0, count: 0 }; });
+    var other = { name: NONE.name, color: NONE.color, plan: 0, ist: 0, count: 0, members: {} };
+    var fallback = groups.filter(function (g) { return g.name.toLowerCase() === 'sonstige'; })[0] || null;
+    var noDate = 0, inYear = 0;
+    issues.forEach(function (it) {
+      if (it.year === null) { noDate++; return; }
+      if (it.year !== year) return;
+      inYear++;
+      var gi = it.status ? groupOf(it.status) : -1;
+      var g = gi >= 0 ? groups[gi] : (it.status && fallback ? fallback : other);
+      g.plan += it.plan; g.ist += it.ist; g.count++;
+      if (gi < 0 && it.status) (g.members = g.members || {})[it.status] = true;
+    });
+    if (other.count) groups.push(other);
+    var totalPlan = groups.reduce(function (s, g) { return s + g.plan; }, 0);
+    var totalIst = groups.reduce(function (s, g) { return s + g.ist; }, 0);
+
+    $('bw-total').textContent = fmt(totalPlan);
+
+    // Ring
+    var svg = $('bw-pie'); while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var R1 = 1, R0 = 0.66, a = -Math.PI / 2;
+    var withPlan = groups.filter(function (g) { return g.plan > 0; });
+    if (!withPlan.length) {
+      svg.appendChild(el('circle', { cx: 0, cy: 0, r: (R0 + R1) / 2, fill: 'none', stroke: '#dfe1e6', 'stroke-width': R1 - R0 }));
+    }
+    withPlan.forEach(function (g) {
+      var frac = g.plan / totalPlan, shape;
+      if (frac >= 0.9999) {
+        shape = el('circle', { cx: 0, cy: 0, r: (R0 + R1) / 2, fill: 'none', stroke: g.color, 'stroke-width': R1 - R0, 'class': 'seg' });
+      } else {
+        var a2 = a + frac * 2 * Math.PI;
+        shape = el('path', { d: arcPath(a, a2, R0, R1), fill: g.color, stroke: '#ffffff', 'stroke-width': 0.02, 'class': 'seg' });
+        a = a2;
+      }
+      var t = el('title', {}); t.textContent = g.name + ': ' + fmt(g.plan) + ' (' + Math.round(frac * 100) + ' %)';
+      shape.appendChild(t); svg.appendChild(shape);
+    });
+
+    // Legende
+    var lb = document.querySelector('#bw-legend tbody'); lb.innerHTML = '';
+    groups.forEach(function (g) {
+      if (!g.count && (g === other || g === fallback)) return;
+      var tr = document.createElement('tr');
+      var c1 = document.createElement('td');
+      var sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = g.color;
+      c1.appendChild(sw); c1.appendChild(document.createTextNode(g.name));
+      if (g === other) c1.title = 'Vorgänge ohne Auswahl im Feld "Status Budget"';
+      else if (g.members) c1.title = 'enthält auch: ' + Object.keys(g.members).join(', ');
+      var c2 = document.createElement('td'); c2.className = 'num'; c2.textContent = fmt(g.plan);
+      var c3 = document.createElement('td'); c3.className = 'pc'; c3.textContent = '(' + (totalPlan ? Math.round(g.plan / totalPlan * 100) : 0) + ' %)';
+      tr.appendChild(c1); tr.appendChild(c2); tr.appendChild(c3); lb.appendChild(tr);
+    });
+
+    // Budgetvergleich
+    var cb = document.querySelector('#bw-cmp tbody'); cb.innerHTML = '';
+    function row(name, plan, ist, cls) {
+      var tr = document.createElement('tr'); if (cls) tr.className = cls;
+      var d = ist - plan;
+      [name, fmt(plan), fmt(ist), (d > 0 ? '+' : d < 0 ? '−' : '') + fmt(Math.abs(d))].forEach(function (v, i) {
+        var td = document.createElement('td'); td.textContent = v;
+        if (i === 3 && d > 0) { td.className = 'over'; td.title = 'Ist über Plan'; }
+        tr.appendChild(td);
+      });
+      cb.appendChild(tr);
+    }
+    row('Gesamt', totalPlan, totalIst, 'sum');
+    groups.forEach(function (g) { if (g.count || (g !== other && g !== fallback)) row(g.name, g.plan, g.ist); });
+
+    // Hinweise
+    var notes = [];
+    notes.push(inYear + (inYear === 1 ? ' Vorgang' : ' Vorgänge') + ' mit Fälligkeit ' + year + '.');
+    if (noDate) notes.push(noDate + (noDate === 1 ? ' Vorgang ohne Fälligkeitsdatum ist' : ' Vorgänge ohne Fälligkeitsdatum sind') + ' nicht enthalten.');
+    $('bw-note').textContent = notes.join(' ');
+    if (!issues.length) {
+      $('bw-msg').textContent = 'Keine Vorgänge mit Gesamtbudget oder Ist-Budget gefunden. Diagnose: Projekt ' + diag.projekt +
+        ', Felder Plan ' + CFG.plan + ' und Ist ' + CFG.ist + '.';
+      if (window.console) console.info('Budget-Panel Diagnose', diag, 'JQL:', jql);
+    } else if (!inYear) {
+      var yrs = {}; issues.forEach(function (it) { if (it.year) yrs[it.year] = 1; });
+      var list = Object.keys(yrs).sort();
+      $('bw-msg').textContent = 'Keine Vorgänge mit Fälligkeit ' + year + '.' + (list.length ? ' Daten vorhanden für: ' + list.join(', ') + '.' : '');
+    }
+  }
+
+  $('bw-prev').onclick = function () { year--; if (issues.length || diag.anzahl) render(); else $('bw-year').textContent = year; };
+  $('bw-next').onclick = function () { year++; if (issues.length || diag.anzahl) render(); else $('bw-year').textContent = year; };
+  $('bw-year').textContent = year;
+  $('bw-title').textContent = String(CFG.titel).replace('{jahr}', year);
 
   Jira.bigButton($('bw-big'), function (t) { $('bw-msg').textContent = t; });
   start();
