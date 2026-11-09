@@ -528,7 +528,7 @@ var Jira = (function () {
   // z. B. .../budget/index.html?feldname=Kosten&gruppierung=epic   (siehe Anleitung)
   var DEFAULTS = {
     projekt:     '',        // leer = Projekt des geöffneten Vorgangs
-    feldname:    'Budget',  // Name des Zahlenfelds, die ID wird automatisch gesucht
+    feldname:    'Gesamtbudget,Budget',  // Name(n) des Budgetfelds, der erste vorhandene wird genommen
     feld:        '',        // alternativ direkt die ID, z. B. customfield_10050
     filter:      '',        // zusätzliche JQL-Bedingung, z. B. labels = 2027
     gruppierung: '',        // 'epic' = nach übergeordnetem Vorgang zusammenfassen
@@ -547,6 +547,25 @@ var Jira = (function () {
   var pct = function (v, t) { return (t ? v / t * 100 : 0).toFixed(1).replace('.', ',') + ' %'; };
   var SVGNS = 'http://www.w3.org/2000/svg';
 
+  // Betrag lesen: Zahl, oder Text wie "12.500,00 €", "12.500", "12,50", "1,234.50"
+  function toAmount(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'object') v = v.value !== undefined ? v.value : '';
+    var t = String(v).replace(/[^\d,.\-]/g, '');
+    var hasC = t.indexOf(',') >= 0, hasD = t.indexOf('.') >= 0;
+    if (hasC && hasD) {
+      // das letzte Zeichen ist das Dezimaltrennzeichen
+      t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+    } else if (hasC) {
+      t = /^-?\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.');
+    } else if (hasD) {
+      if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');   // deutsche Tausenderpunkte
+    }
+    var n = parseFloat(t);
+    return isNaN(n) ? 0 : n;
+  }
+
   function fail(text) { $('bw-total').textContent = '–'; $('bw-msg').textContent = text; }
 
   var jql = '';
@@ -559,8 +578,15 @@ var Jira = (function () {
         if (window.console) console.info('Jira-Panel: Projekt nicht erkannt, Kontext:', Jira.contextInfo());
         return Jira.askProject();
       }).then(function (key) {
-      Jira.resolveField(CFG.feld, CFG.feldname, key, 'number').then(function (f) {
-        if (!f) { fail('Feld "' + CFG.feldname + '" nicht gefunden. In der ScriptRunner-URL ?feldname=... oder ?feld=customfield_... angeben.'); return; }
+      // Namen der Reihe nach: je Name erst ein Zahlenfeld, dann ein Feld beliebigen Typs (z. B. Text)
+      var names = String(CFG.feldname).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+      var chain = CFG.feld ? Jira.resolveField(CFG.feld, '', key, null) : Promise.resolve(null);
+      names.forEach(function (n) {
+        chain = chain.then(function (f) { return f || Jira.resolveField('', n, key, 'number'); })
+                     .then(function (f) { return f || Jira.resolveField('', n, key, null); });
+      });
+      chain.then(function (f) {
+        if (!f) { fail('Feld "' + CFG.feldname.split(',').join('" bzw. "') + '" nicht gefunden. In der ScriptRunner-URL ?feldname=... oder ?feld=customfield_... angeben.'); return; }
         FIELD = f.id;
         jql = 'project = "' + key + '" AND cf[' + f.id.replace('customfield_', '') + '] is not EMPTY' +
               (CFG.filter ? ' AND (' + CFG.filter + ')' : '') + ' ORDER BY created DESC';
@@ -578,7 +604,7 @@ var Jira = (function () {
     Jira.get(url).then(
       function (data) {
         (data.issues || []).forEach(function (i) {
-          var amount = Number(i.fields[FIELD]) || 0;
+          var amount = toAmount(i.fields[FIELD]);
           var label = i.key + ' ' + i.fields.summary;
           if (GROUP_BY_PARENT) {
             var p = i.fields.parent;
